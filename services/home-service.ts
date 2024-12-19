@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/utils/supabase/client";
 
 const supabase = createClient();
 
@@ -33,6 +33,10 @@ export interface HomeSettings {
     contact_description: string;
     contact_receiver_email: string;
     contact_industries: string[];
+    seo_title: string;
+    seo_description: string;
+    seo_keywords: string;
+    og_image: string;
 }
 
 export interface UploadImageParams {
@@ -46,7 +50,7 @@ export async function getHomeSettings() {
         .select('*')
         .single();
 
-    if (error) throw error;
+    if (error) return null;
     return data as HomeSettings;
 }
 

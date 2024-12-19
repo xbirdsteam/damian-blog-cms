@@ -1,41 +1,40 @@
 import { AboutData, TimelineItem } from '@/types/about';
-import { createClient } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/client';
 
-const supabase = createClient();
 
 export async function getAboutData() {
+    const supabase = createClient();
     const { data, error } = await supabase
         .from('about')
         .select('*')
         .single();
 
-    if (error) throw error;
+    if (error) return null;
     return data as AboutData;
 }
 
 export async function updateAboutData(updates: Partial<AboutData>) {
+    const supabase = createClient();
     const { error } = await supabase
         .from('about')
-        .update(updates)
-        .eq('id', 1) // Assuming we're always updating the first record
+        .upsert({ ...updates, id: 1 }, { onConflict: 'id' })
 
     if (error) throw error;
     return true;
 }
 
 export async function updateTimelineItems(timeline: TimelineItem[]) {
+    const supabase = createClient();
     const { error } = await supabase
         .from('about')
-        .update({ timeline })
-        .eq('id', 1)
-        .select()
-        .single();
+        .upsert({ timeline, id: 1 }, { onConflict: 'id' })
 
     if (error) throw error;
     return true;
 }
 
 export async function uploadProfileImage(file: File) {
+    const supabase = createClient();
     const PROFILE_IMAGE_PATH = 'about-me/profile-image';
     const fileExt = file.name.substring(file.name.lastIndexOf('.'));
     const fileName = `${PROFILE_IMAGE_PATH}${fileExt}`;
@@ -57,8 +56,7 @@ export async function uploadProfileImage(file: File) {
     // Update profile image in database
     const { error } = await supabase
         .from('about')
-        .update({ image_url: publicUrl })
-        .eq('id', 1)
+        .upsert({ id: 1, image_url: publicUrl }, { onConflict: 'id' })
 
     if (error) throw error;
     return true;
@@ -69,10 +67,10 @@ export async function updateSEO(seoData: {
     seo_description: string;
     seo_keywords: string;
 }) {
+    const supabase = createClient();
     const { error } = await supabase
         .from('about')
-        .update(seoData)
-        .eq('id', 1);
+        .upsert({ ...seoData, id: 1 }, { onConflict: 'id' });
 
     if (error) throw error;
     return true;

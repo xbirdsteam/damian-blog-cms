@@ -17,7 +17,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { useSettings } from "@/hooks/use-settings";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Globe, Instagram, Linkedin, Loader2, Youtube } from "lucide-react";
@@ -26,8 +25,6 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 
 const formSchema = z.object({
-  website_title: z.string().min(1, "Website title is required"),
-  copyright: z.string().min(1, "Copyright text is required"),
   social_links: z.object({
     instagram: z.string().url().optional().or(z.literal("")),
     youtube: z.string().url().optional().or(z.literal("")),
@@ -53,8 +50,6 @@ export function FooterSettings() {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      website_title: "",
-      copyright: "",
       social_links: {
         instagram: "",
         youtube: "",
@@ -67,8 +62,6 @@ export function FooterSettings() {
   useEffect(() => {
     if (data) {
       form.reset({
-        website_title: data.website_title || "",
-        copyright: data.copyright || "",
         social_links: {
           instagram: data.social_links?.instagram || "",
           youtube: data.social_links?.youtube || "",
@@ -86,51 +79,6 @@ export function FooterSettings() {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Website Information</CardTitle>
-            <CardDescription>
-              Configure your website title and copyright information
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <FormField
-              control={form.control}
-              name="website_title"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Website Title</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Enter website title"
-                      {...field}
-                      disabled={isSavingFooter}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="copyright"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Copyright Text</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Enter copyright text"
-                      {...field}
-                      disabled={isSavingFooter}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </CardContent>
-        </Card>
-
         <Card>
           <CardHeader>
             <CardTitle>Social Links</CardTitle>

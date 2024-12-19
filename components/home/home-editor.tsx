@@ -1,15 +1,18 @@
 "use client";
 
 import { SeoSettingsModal } from "@/components/common/seo-settings-modal";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useHomeSettings } from "@/hooks/use-home-settings";
 import { uploadHomeImage } from "@/services/home-service";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { ImageIcon, Layout, Mail, Type } from "lucide-react";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
+import { toast } from "sonner";
 import * as z from "zod";
+import { Card, CardContent, CardHeader } from "../ui/card";
 import { AboutSection } from "./about-section";
 import { ContactSection } from "./contact-section";
 import { HeroSection } from "./hero-section";
@@ -64,7 +67,12 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 export function HomeEditor() {
-  const { data, isLoading: isSettingsLoading, isSaving } = useHomeSettings();
+  const {
+    data,
+    isLoading: isSettingsLoading,
+    isSaving,
+    handleSectionUpdate,
+  } = useHomeSettings();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -139,18 +147,33 @@ export function HomeEditor() {
           industries: data.contact_industries || [],
         },
         seo: {
-          title: "",
-          description: "",
-          keywords: "",
-          og_image: "",
+          title: data.seo_title || "",
+          description: data.seo_description || "",
+          keywords: data.seo_keywords || "",
+          og_image: data.og_image || "",
         },
       });
     }
   }, [data, form]);
 
   const handleSeoSubmit = async (values: z.infer<typeof seoSchema>) => {
-    // Handle SEO form submission
-    console.log(values);
+    if (!data?.id) return;
+
+    try {
+      await handleSectionUpdate(data.id, "seo", {
+        seo_title: values.title,
+        seo_description: values.description,
+        seo_keywords: values.keywords,
+        og_image: values.og_image || "",
+      });
+
+      // Update form values
+      form.setValue("seo", values);
+      toast.success("SEO settings updated successfully");
+    } catch (error) {
+      console.error("Error updating SEO settings:", error);
+      toast.error("Failed to update SEO settings");
+    }
   };
 
   const handleSeoImageUpload = async (file: File) => {
@@ -234,12 +257,17 @@ export function HomeEditor() {
         </div>
       ) : (
         <Form {...form}>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="flex items-center justify-between">
+          <form onSubmit={handleSubmit} className="space-y-8">
+            <div className="flex items-center justify-between border-b pb-4">
+              <h1 className="text-2xl font-semibold tracking-tight">
+                Home Page Settings
+              </h1>
               <SeoSettingsModal
                 defaultValues={{
-                  ...form.getValues("seo"),
-                  og_image: form.getValues("seo.og_image") || "",
+                  title: data?.seo_title || "",
+                  description: data?.seo_description || "",
+                  keywords: data?.seo_keywords || "",
+                  og_image: data?.og_image || "",
                 }}
                 onSubmit={handleSeoSubmit}
                 onImageUpload={handleSeoImageUpload}
@@ -248,13 +276,50 @@ export function HomeEditor() {
               />
             </div>
 
-            <HeroSection form={form} />
+            <Tabs defaultValue="hero" className="space-y-6">
+              <TabsList className="grid w-full grid-cols-4 gap-4 bg-muted p-1">
+                <TabsTrigger value="hero" className="space-x-2">
+                  <Layout className="h-4 w-4" />
+                  <span>Hero</span>
+                </TabsTrigger>
+                <TabsTrigger value="about" className="space-x-2">
+                  <ImageIcon className="h-4 w-4" />
+                  <span>About</span>
+                </TabsTrigger>
+                <TabsTrigger value="recipes" className="space-x-2">
+                  <Type className="h-4 w-4" />
+                  <span>Recipes</span>
+                </TabsTrigger>
+                <TabsTrigger value="contact" className="space-x-2">
+                  <Mail className="h-4 w-4" />
+                  <span>Contact</span>
+                </TabsTrigger>
+              </TabsList>
 
-            <AboutSection form={form} />
+              <TabsContent value="hero" className="space-y-4">
+                <div className="grid gap-6">
+                  <HeroSection form={form} />
+                </div>
+              </TabsContent>
 
-            <RecipeSection form={form} />
+              <TabsContent value="about" className="space-y-4">
+                <div className="grid gap-6">
+                  <AboutSection form={form} />
+                </div>
+              </TabsContent>
 
-            <ContactSection form={form} />
+              <TabsContent value="recipes" className="space-y-4">
+                <div className="grid gap-6">
+                  <RecipeSection form={form} />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="contact" className="space-y-4">
+                <div className="grid gap-6">
+                  <ContactSection form={form} />
+                </div>
+              </TabsContent>
+            </Tabs>
           </form>
         </Form>
       )}

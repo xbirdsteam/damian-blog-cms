@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
@@ -80,18 +81,16 @@ export function AboutEditor() {
     );
   }
 
-  if (!data) return null;
-
   return (
     <div className="relative mx-auto space-y-12 px-2 sm:px-4 pb-12 md:space-y-24 md:pb-24">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">About Page</h1>
         <SeoSettingsModal
           defaultValues={{
-            title: data.seo_title ?? "",
-            description: data.seo_description ?? "",
-            keywords: data.seo_keywords ?? "",
-            og_image: data.og_image ?? "",
+            title: data?.seo_title ?? "",
+            description: data?.seo_description ?? "",
+            keywords: data?.seo_keywords ?? "",
+            og_image: data?.og_image ?? "",
           }}
           onSubmit={handleSeoSubmit}
           onImageUpload={handleSeoImageUpload}
@@ -110,7 +109,7 @@ export function AboutEditor() {
             Title
           </span>
           <p className="text-4xl md:text-6xl font-bold tracking-tight">
-            {data.title}
+            {data?.title}
           </p>
         </div>
         <Button
@@ -133,7 +132,7 @@ export function AboutEditor() {
             Introduction
           </span>
           <p className="text-lg md:text-xl leading-relaxed text-muted-foreground">
-            {data.introduction}
+            {data?.introduction}
           </p>
         </div>
         <Button
@@ -173,7 +172,7 @@ export function AboutEditor() {
               <div className="absolute inset-0 -translate-x-full group-hover/image:animate-sweep bg-gradient-to-r from-transparent via-white/20 to-transparent" />
               <img
                 src={
-                  data.image_url ||
+                  data?.image_url ||
                   "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=800&h=1067&fit=crop"
                 }
                 alt="Profile"
@@ -206,7 +205,7 @@ export function AboutEditor() {
             </div>
             <div className="relative space-y-6">
               <div className="absolute left-3 top-4 bottom-4 w-px bg-gradient-to-b from-primary/20 via-primary to-primary/20" />
-              {data.timeline.map((item) => (
+              {data?.timeline?.map((item) => (
                 <div
                   key={item.year}
                   className="group/item relative pl-10 transition-all hover:pl-12 duration-300"
@@ -238,7 +237,7 @@ export function AboutEditor() {
             Closing Statement
           </span>
           <p className="text-lg md:text-xl leading-relaxed text-muted-foreground">
-            {data.closing_paragraph}
+            {data?.closing_paragraph}
           </p>
         </div>
         <Button
@@ -256,7 +255,7 @@ export function AboutEditor() {
         open={editingSection === "title"}
         onOpenChange={(open) => !open && setEditingSection(null)}
         title="Page Title"
-        content={data.title}
+        content={data?.title ?? ""}
         onSave={handleUpdateTitle}
         inputType="input"
       />
@@ -264,27 +263,27 @@ export function AboutEditor() {
         open={editingSection === "introduction"}
         onOpenChange={(open) => !open && setEditingSection(null)}
         title="Introduction"
-        content={data.introduction}
+        content={data?.introduction ?? ""}
         onSave={handleUpdateIntroduction}
       />
       <EditDialog
         open={editingSection === "closing"}
         onOpenChange={(open) => !open && setEditingSection(null)}
         title="Closing Paragraph"
-        content={data.closing_paragraph}
+        content={data?.closing_paragraph ?? ""}
         onSave={handleUpdateClosing}
       />
       <TimelineDialog
         open={editingSection === "timeline"}
         onOpenChange={(open) => !open && setEditingSection(null)}
-        items={data.timeline}
+        items={data?.timeline ?? []}
         onSave={handleUpdateTimeline}
       />
       <ImageDialog
         open={editingSection === "image"}
         onOpenChange={(open) => !open && setEditingSection(null)}
         currentImage={
-          data.image_url ||
+          data?.image_url ||
           "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=800&h=1067&fit=crop"
         }
         onSave={handleUploadImage}

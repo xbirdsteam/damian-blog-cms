@@ -49,7 +49,7 @@ export const useHomeSettings = () => {
 
     const handleSectionUpdate = async (
         id: string,
-        section: "about" | "hero" | "recipes" | "contact",
+        section: "about" | "hero" | "recipes" | "contact" | "seo",
         updates: Partial<HomeSettings>
     ) => {
         try {

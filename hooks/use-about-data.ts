@@ -1,5 +1,6 @@
+import { getAboutData, updateAboutData, updateSEO, updateTimelineItems, uploadProfileImage } from "@/services/about-service";
 import { AboutData, TimelineItem } from "@/types/about";
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/utils/supabase/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -10,27 +11,11 @@ export function useAboutData() {
 
     const query = useQuery({
         queryKey: ["about"],
-        queryFn: async () => {
-            const { data, error } = await supabase
-                .from("about")
-                .select("*")
-                .single();
-
-            if (error) throw error;
-            return data as AboutData;
-        },
+        queryFn: getAboutData,
     });
 
     const updateMutation = useMutation({
-        mutationFn: async (data: Partial<AboutData>) => {
-            const { error } = await supabase
-                .from("about")
-                .update(data)
-                .eq("id", 1);
-
-            if (error) throw error;
-            return true;
-        },
+        mutationFn: updateAboutData,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["about"] });
             toast.success("Changes saved successfully");
@@ -42,31 +27,7 @@ export function useAboutData() {
     });
 
     const uploadMutation = useMutation({
-        mutationFn: async ({ file, path }: { file: File; path?: string }) => {
-            const fileExt = file.name.substring(file.name.lastIndexOf("."));
-            const fileName = path ? `${path}${fileExt}` : `profile${fileExt}`;
-
-            const { error: uploadError } = await supabase.storage
-                .from("images")
-                .upload(fileName, file, {
-                    cacheControl: "3600",
-                    upsert: true,
-                });
-
-            if (uploadError) throw uploadError;
-
-            const { data } = supabase.storage
-                .from("images")
-                .getPublicUrl(fileName);
-
-            if (!path) {
-                await updateMutation.mutateAsync({
-                    image_url: data.publicUrl,
-                });
-            }
-
-            return data.publicUrl;
-        },
+        mutationFn: uploadProfileImage,
         onSuccess: () => {
             toast.success("Image uploaded successfully");
         },
@@ -77,15 +38,7 @@ export function useAboutData() {
     });
 
     const timelineMutation = useMutation({
-        mutationFn: async (timeline: TimelineItem[]) => {
-            const { error } = await supabase
-                .from("about")
-                .update({ timeline })
-                .eq("id", 1);
-
-            if (error) throw error;
-            return true;
-        },
+        mutationFn: updateTimelineItems,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["about"] });
             toast.success("Timeline updated successfully");
@@ -97,20 +50,7 @@ export function useAboutData() {
     });
 
     const seoMutation = useMutation({
-        mutationFn: async (data: {
-            seo_title: string;
-            seo_description: string;
-            seo_keywords: string;
-            og_image: string | null;
-        }) => {
-            const { error } = await supabase
-                .from("about")
-                .update(data)
-                .eq("id", 1);
-
-            if (error) throw error;
-            return true;
-        },
+        mutationFn: updateSEO,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["about"] });
             toast.success("SEO settings updated successfully");

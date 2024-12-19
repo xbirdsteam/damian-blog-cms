@@ -1,21 +1,21 @@
 "use client";
 
-import * as React from "react";
-import { Home, User, Settings } from "lucide-react";
-import { usePathname } from "next/navigation";
-import Link from "next/link";
 import {
   Sidebar,
-  SidebarHeader,
   SidebarContent,
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import { FileText, Home, Settings, User } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import * as React from "react";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
@@ -38,6 +38,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       url: "/cms/about",
       icon: User,
       isActive: pathname === "/cms/about",
+    },
+    {
+      title: "Posts",
+      url: "/cms/posts",
+      icon: FileText,
+      isActive: pathname === "/cms/posts",
     },
   ];
 

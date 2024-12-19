@@ -10,13 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { FormControl, FormField, FormItem } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { LoadingImage } from "@/components/ui/loading-image";
 import { useHomeSettings } from "@/hooks/use-home-settings";
@@ -25,8 +19,8 @@ import { addCacheBuster } from "@/utils/url-helpers";
 import { Loader2, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { UseFormReturn } from "react-hook-form";
-import { FormValues } from "./types";
 import { toast } from "sonner";
+import { FormValues } from "./types";
 
 interface HeroSectionProps {
   form: UseFormReturn<FormValues>;
@@ -133,160 +127,175 @@ export function HeroSection({ form }: HeroSectionProps) {
   }, [previewImage]);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Hero Section</CardTitle>
-        <CardDescription>Configure your homepage hero section</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Desktop Background */}
-          <FormField
-            control={form.control}
-            name="hero.background.desktop"
-            render={() => (
-              <FormItem>
-                <FormLabel>Desktop Background</FormLabel>
-                <FormControl>
-                  <div className="space-y-4">
-                    {(previewImage.desktop || data?.hero_image_url) && (
-                      <div className="relative aspect-[21/9] w-full overflow-hidden rounded-lg border">
-                        <LoadingImage
-                          src={
-                            previewImage.desktop ||
-                            addCacheBuster(data?.hero_image_url)
-                          }
-                          alt="Desktop Background Preview"
-                          fill
-                          className="object-cover"
-                          unoptimized
-                        />
-                      </div>
-                    )}
-                    <div className="flex items-center gap-4">
-                      <Input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleImageSelect(e, "desktop")}
-                        className="hidden"
-                        id="hero-desktop-bg-upload"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() =>
-                          document
-                            .getElementById("hero-desktop-bg-upload")
-                            ?.click()
-                        }
-                        disabled={isSaving}
-                      >
-                        <Upload className="mr-2 h-4 w-4" />
-                        {data?.hero_image_url
-                          ? "Change Desktop Background"
-                          : "Choose Desktop Background"}
-                      </Button>
-                      {desktopFile && (
-                        <Button
-                          type="button"
-                          onClick={() => handleUpload("desktop")}
-                          disabled={isSaving || uploadingType === "desktop"}
-                        >
-                          {uploadingType === "desktop" ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Uploading...
-                            </>
-                          ) : (
-                            <>
-                              <Upload className="mr-2 h-4 w-4" />
-                              Upload
-                            </>
-                          )}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Mobile Background */}
-          <FormField
-            control={form.control}
-            name="hero.background.mobile"
-            render={() => (
-              <FormItem>
-                <FormLabel>Mobile Background</FormLabel>
-                <FormControl>
-                  <div className="space-y-4">
-                    {(previewImage.mobile || data?.hero_mobile_image_url) && (
-                      <div className="relative aspect-[21/9] w-full overflow-hidden rounded-lg border">
-                        <LoadingImage
-                          src={
-                            previewImage.mobile ||
-                            addCacheBuster(data?.hero_mobile_image_url)
-                          }
-                          alt="Mobile Background Preview"
-                          fill
-                          className="object-cover"
-                          unoptimized
-                        />
-                      </div>
-                    )}
-                    <div className="flex items-center gap-4">
-                      <Input
-                        type="file"
-                        accept="image/*"
-                        onChange={(e) => handleImageSelect(e, "mobile")}
-                        className="hidden"
-                        id="hero-mobile-bg-upload"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() =>
-                          document
-                            .getElementById("hero-mobile-bg-upload")
-                            ?.click()
-                        }
-                        disabled={isSaving}
-                      >
-                        <Upload className="mr-2 h-4 w-4" />
-                        {data?.hero_mobile_image_url
-                          ? "Change Mobile Background"
-                          : "Choose Mobile Background"}
-                      </Button>
-                      {mobileFile && (
-                        <Button
-                          type="button"
-                          onClick={() => handleUpload("mobile")}
-                          disabled={isSaving || uploadingType === "mobile"}
-                        >
-                          {uploadingType === "mobile" ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Uploading...
-                            </>
-                          ) : (
-                            <>
-                              <Upload className="mr-2 h-4 w-4" />
-                              Upload
-                            </>
-                          )}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-medium">Hero Section</h2>
+          <p className="text-sm text-muted-foreground">
+            Configure your homepage hero section appearance
+          </p>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+
+      <div className="grid gap-8 lg:grid-cols-2">
+        {/* Desktop Background */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Desktop Background</CardTitle>
+            <CardDescription>Recommended size: 1920x1080px</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FormField
+              control={form.control}
+              name="hero.background.desktop"
+              render={() => (
+                <FormItem>
+                  <FormControl>
+                    <div className="space-y-4">
+                      {(previewImage.desktop || data?.hero_image_url) && (
+                        <div className="relative aspect-[21/9] w-full overflow-hidden rounded-lg border">
+                          <LoadingImage
+                            src={
+                              previewImage.desktop ||
+                              addCacheBuster(data?.hero_image_url)
+                            }
+                            alt="Desktop Background Preview"
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
+                        </div>
+                      )}
+                      <div className="flex items-center gap-4">
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleImageSelect(e, "desktop")}
+                          className="hidden"
+                          id="hero-desktop-bg-upload"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() =>
+                            document
+                              .getElementById("hero-desktop-bg-upload")
+                              ?.click()
+                          }
+                          disabled={isSaving}
+                        >
+                          <Upload className="mr-2 h-4 w-4" />
+                          {data?.hero_image_url
+                            ? "Change Desktop Background"
+                            : "Choose Desktop Background"}
+                        </Button>
+                        {desktopFile && (
+                          <Button
+                            type="button"
+                            onClick={() => handleUpload("desktop")}
+                            disabled={isSaving || uploadingType === "desktop"}
+                          >
+                            {uploadingType === "desktop" ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Uploading...
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="mr-2 h-4 w-4" />
+                                Upload
+                              </>
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Mobile Background */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Mobile Background</CardTitle>
+            <CardDescription>Recommended size: 750x1334px</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <FormField
+              control={form.control}
+              name="hero.background.mobile"
+              render={() => (
+                <FormItem>
+                  <FormControl>
+                    <div className="space-y-4">
+                      {(previewImage.mobile || data?.hero_mobile_image_url) && (
+                        <div className="relative aspect-[21/9] w-full overflow-hidden rounded-lg border">
+                          <LoadingImage
+                            src={
+                              previewImage.mobile ||
+                              addCacheBuster(data?.hero_mobile_image_url)
+                            }
+                            alt="Mobile Background Preview"
+                            fill
+                            className="object-cover"
+                            unoptimized
+                          />
+                        </div>
+                      )}
+                      <div className="flex items-center gap-4">
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleImageSelect(e, "mobile")}
+                          className="hidden"
+                          id="hero-mobile-bg-upload"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() =>
+                            document
+                              .getElementById("hero-mobile-bg-upload")
+                              ?.click()
+                          }
+                          disabled={isSaving}
+                        >
+                          <Upload className="mr-2 h-4 w-4" />
+                          {data?.hero_mobile_image_url
+                            ? "Change Mobile Background"
+                            : "Choose Mobile Background"}
+                        </Button>
+                        {mobileFile && (
+                          <Button
+                            type="button"
+                            onClick={() => handleUpload("mobile")}
+                            disabled={isSaving || uploadingType === "mobile"}
+                          >
+                            {uploadingType === "mobile" ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Uploading...
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="mr-2 h-4 w-4" />
+                                Upload
+                              </>
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 }

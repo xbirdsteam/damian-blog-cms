@@ -9,7 +9,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="min-h-screen">
+      <body className="min-h-screen custom-scroll">
         <QueryProvider>{children}</QueryProvider>
         <Toaster />
       </body>

@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase";
+import { createClient } from "@/utils/supabase/client";
 
 const supabase = createClient();
 
@@ -13,8 +13,6 @@ export interface HeaderSettings {
 }
 
 export interface FooterSettings {
-    website_title: string;
-    copyright: string;
     social_links: {
         [key: string]: string;
     };
@@ -44,8 +42,7 @@ export async function uploadLogo(file: File) {
     // Update settings in database
     const { error } = await supabase
         .from('settings')
-        .update({ logo_url: publicUrl })
-        .eq('id', 1);
+        .upsert({ logo_url: publicUrl, id: 1 }, { onConflict: 'id' })
 
     if (error) throw error;
     return publicUrl;
@@ -54,8 +51,7 @@ export async function uploadLogo(file: File) {
 export async function updateNavigation(navigation: NavigationItem[]) {
     const { error } = await supabase
         .from('settings')
-        .update({ navigation })
-        .eq('id', 1);
+        .upsert({ navigation, id: 1 }, { onConflict: 'id' })
 
     if (error) throw error;
     return true;
@@ -67,15 +63,17 @@ export async function getSettings() {
         .select('*')
         .single();
 
-    if (error) throw error;
+    if (error) return null;
     return data as Settings;
 }
 
 export async function updateFooter(settings: FooterSettings) {
     const { error } = await supabase
         .from('settings')
-        .update(settings)
-        .eq('id', 1);
+        .upsert({
+            social_links: settings.social_links,
+            id: 1
+        }, { onConflict: 'id' })
 
     if (error) throw error;
     return true;
