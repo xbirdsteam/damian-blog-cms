@@ -33,11 +33,11 @@ export async function updateTimelineItems(timeline: TimelineItem[]) {
     return true;
 }
 
-export async function uploadProfileImage(file: File) {
+export async function uploadProfileImage(file: File, path?: string) {
     const supabase = createClient();
     const PROFILE_IMAGE_PATH = 'about-me/profile-image';
     const fileExt = file.name.substring(file.name.lastIndexOf('.'));
-    const fileName = `${PROFILE_IMAGE_PATH}${fileExt}`;
+    const fileName = path ? `${path}${fileExt}` : `${PROFILE_IMAGE_PATH}${fileExt}`;
 
     // Upload to storage with upsert to replace existing file
     const { error: uploadError } = await supabase
@@ -59,13 +59,14 @@ export async function uploadProfileImage(file: File) {
         .upsert({ id: 1, image_url: publicUrl }, { onConflict: 'id' })
 
     if (error) throw error;
-    return true;
+    return publicUrl;
 }
 
 export async function updateSEO(seoData: {
     seo_title: string;
     seo_description: string;
     seo_keywords: string;
+    og_image: string;
 }) {
     const supabase = createClient();
     const { error } = await supabase

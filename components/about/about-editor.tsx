@@ -49,7 +49,7 @@ export function AboutEditor() {
   };
 
   const handleUploadImage = async (file: File) => {
-    await uploadImage({ file });
+    await uploadImage(file);
   };
 
   const handleSeoSubmit = async (values: z.infer<typeof seoSchema>) => {
@@ -66,10 +66,7 @@ export function AboutEditor() {
   };
 
   const handleSeoImageUpload = async (file: File) => {
-    const url = await uploadImage({
-      file,
-      path: "about/seo/og-image",
-    });
+    const url = await uploadImage(file, "about/seo/og-image");
     return url;
   };
 

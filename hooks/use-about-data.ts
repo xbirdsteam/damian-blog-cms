@@ -1,10 +1,6 @@
 import { getAboutData, updateAboutData, updateSEO, updateTimelineItems, uploadProfileImage } from "@/services/about-service";
-import { AboutData, TimelineItem } from "@/types/about";
-import { createClient } from "@/utils/supabase/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-
-const supabase = createClient();
 
 export function useAboutData() {
     const queryClient = useQueryClient();
@@ -66,7 +62,7 @@ export function useAboutData() {
         isLoading: query.isLoading,
         updateData: updateMutation.mutateAsync,
         updateTimeline: timelineMutation.mutateAsync,
-        uploadImage: uploadMutation.mutateAsync,
+        uploadImage: uploadProfileImage,
         updateSEO: seoMutation.mutateAsync,
         isSaving:
             updateMutation.isPending ||
