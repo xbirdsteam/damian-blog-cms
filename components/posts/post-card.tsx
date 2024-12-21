@@ -53,7 +53,7 @@ export function PostCard({ post }: PostCardProps) {
       <Link href={`/cms/posts/${post.id}`}>
         <Card
           key={post.id}
-          className="group overflow-hidden border cursor-pointer relative flex flex-col"
+          className="group overflow-hidden border cursor-pointer relative flex flex-col min-h-[400px]"
         >
           {/* Featured Image */}
           <div className="relative w-full aspect-video bg-muted border-b">
@@ -79,8 +79,8 @@ export function PostCard({ post }: PostCardProps) {
           </div>
 
           {/* Content */}
-          <div className="p-6 space-y-4 flex-1">
-            <div className="space-y-2">
+          <div className="p-6 space-y-4 flex-1 flex flex-col">
+            <div className="space-y-2 flex-1">
               <h3 className="font-semibold text-xl line-clamp-2 leading-tight">
                 {post.title}
               </h3>
@@ -90,9 +90,9 @@ export function PostCard({ post }: PostCardProps) {
             </div>
 
             {/* Meta Information */}
-            <div className="pt-4 border-t space-y-3 text-sm text-muted-foreground">
+            <div className="space-y-3 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
+                <Calendar className="h-4 w-4 flex-shrink-0" />
                 <span>
                   {formatDistanceToNow(new Date(post.created_at), {
                     addSuffix: true,
@@ -101,8 +101,8 @@ export function PostCard({ post }: PostCardProps) {
               </div>
 
               {post.posts_categories && post.posts_categories.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <Tag className="h-4 w-4" />
+                <div className="flex items-start gap-2 pb-12">
+                  <Tag className="h-4 w-4 flex-shrink-0 mt-1" />
                   <div className="flex flex-wrap gap-1">
                     {post.posts_categories.map((pc) => (
                       <Badge

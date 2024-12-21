@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, X } from "lucide-react";
+import { GripVertical, X, Loader2, Trash2 } from "lucide-react";
 import { Category } from "./category-list";
 
 interface CategoryItemProps {
@@ -13,6 +13,7 @@ interface CategoryItemProps {
   onRemove: () => void;
   onToggleActive: (isActive: boolean) => void;
   disabled?: boolean;
+  isDeleting?: boolean;
 }
 
 export function CategoryItem({
@@ -20,6 +21,7 @@ export function CategoryItem({
   onRemove,
   onToggleActive,
   disabled,
+  isDeleting,
 }: CategoryItemProps) {
   const {
     attributes,
@@ -77,16 +79,15 @@ export function CategoryItem({
 
         <Button
           variant="ghost"
-          size="sm"
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemove();
-          }}
-          className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive"
-          disabled={disabled}
+          size="icon"
+          disabled={disabled || isDeleting}
+          onClick={onRemove}
         >
-          <X className="h-4 w-4" />
-          <span className="sr-only">Remove {category.name}</span>
+          {isDeleting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Trash2 className="h-4 w-4" />
+          )}
         </Button>
       </div>
     </div>

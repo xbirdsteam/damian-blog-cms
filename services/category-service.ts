@@ -8,7 +8,6 @@ export const categoryService = {
             .from("categories")
             .select("*")
             .order("index");
-
         if (error) throw error;
         return data as Category[];
     },

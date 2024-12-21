@@ -48,15 +48,6 @@ export async function uploadLogo(file: File) {
     return publicUrl;
 }
 
-export async function updateNavigation(navigation: NavigationItem[]) {
-    const { error } = await supabase
-        .from('settings')
-        .upsert({ navigation, id: 1 }, { onConflict: 'id' })
-
-    if (error) throw error;
-    return true;
-}
-
 export async function getSettings() {
     const { data, error } = await supabase
         .from('settings')

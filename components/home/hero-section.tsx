@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
@@ -160,9 +161,9 @@ export function HeroSection({ form }: HeroSectionProps) {
                               addCacheBuster(data?.hero_image_url)
                             }
                             alt="Desktop Background Preview"
-                            fill
                             className="object-cover"
-                            unoptimized
+                            fill
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                           />
                         </div>
                       )}

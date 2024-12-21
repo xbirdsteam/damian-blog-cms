@@ -1,4 +1,4 @@
-import { getSettings, updateNavigation, uploadLogo, updateFooter } from "@/services/settings-service";
+import { getSettings, uploadLogo, updateFooter } from "@/services/settings-service";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -22,18 +22,6 @@ export function useSettings() {
         },
     });
 
-    const updateNavigationMutation = useMutation({
-        mutationFn: updateNavigation,
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["settings"] });
-            toast.success("Navigation updated successfully");
-        },
-        onError: (error) => {
-            console.error("Error updating navigation:", error);
-            toast.error("Failed to update navigation");
-        },
-    });
-
     const updateFooterMutation = useMutation({
         mutationFn: updateFooter,
         onSuccess: () => {
@@ -50,9 +38,7 @@ export function useSettings() {
         data: query.data,
         isLoading: query.isLoading,
         uploadLogo: uploadLogoMutation.mutateAsync,
-        updateNavigation: updateNavigationMutation.mutateAsync,
         isUploading: uploadLogoMutation.isPending,
-        isSaving: updateNavigationMutation.isPending,
         updateFooter: updateFooterMutation.mutateAsync,
         isSavingFooter: updateFooterMutation.isPending,
     };

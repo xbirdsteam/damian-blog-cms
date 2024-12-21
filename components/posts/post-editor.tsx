@@ -457,7 +457,7 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
               <FormItem>
                 <FormLabel>Content</FormLabel>
                 <Card>
-                  <CardContent className="p-4">
+                  <CardContent className="p-4" data-registry="plate">
                     <SettingsProvider>
                       <PlateEditorComponent
                         initialContent={field.value}

@@ -25,7 +25,7 @@ import {
 } from "@dnd-kit/sortable";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, Plus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CategoryItem } from "./category-item";
 import { toast } from "sonner";
 import { categoryService } from "@/services/category-service";
@@ -76,19 +76,28 @@ function CategorySkeleton() {
 export function CategoryList() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [newCategory, setNewCategory] = useState("");
-  const [isAdding, setIsAdding] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(
     null
   );
 
-  const { isLoading } = useQuery({
-    queryKey: ["categories"],
-    queryFn: async () => {
-      const data = await categoryService.getCategories();
-      setCategories(data);
-      return data;
-    },
-  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const data = await categoryService.getCategories();
+        setCategories(data);
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -161,16 +170,39 @@ export function CategoryList() {
 
   const handleAddCategory = async () => {
     if (!newCategory.trim()) return;
-    setIsAdding(true);
+
+    // Generate a temporary ID
+    const tempId = crypto.randomUUID();
+
+    // Create optimistic category
+    const optimisticCategory: Category = {
+      id: tempId,
+      name: newCategory.trim(),
+      slug: newCategory
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-"),
+      index: categories.length,
+      is_active: true,
+    };
+
+    // Optimistically update UI
+    setCategories([...categories, optimisticCategory]);
+    setNewCategory("");
 
     try {
       const newCategoryData = await categoryService.addCategory(newCategory);
-      setCategories([...categories, newCategoryData]);
-      setNewCategory("");
+      // Replace optimistic category with real data
+      setCategories((categories) =>
+        categories.map((cat) => (cat.id === tempId ? newCategoryData : cat))
+      );
     } catch (error) {
       console.error("Error adding category:", error);
-    } finally {
-      setIsAdding(false);
+      // Remove optimistic category on error
+      setCategories((categories) =>
+        categories.filter((cat) => cat.id !== tempId)
+      );
+      toast.error("Failed to add category");
     }
   };
 
@@ -197,6 +229,9 @@ export function CategoryList() {
   };
 
   const handleDeleteCategory = async (categoryId: string) => {
+    // Add to deleting set
+    setDeletingIds((prev) => new Set(prev).add(categoryId));
+
     // Optimistically update UI
     const previousCategories = [...categories];
     setCategories(categories.filter((c) => c.id !== categoryId));
@@ -209,17 +244,27 @@ export function CategoryList() {
       // Revert on error
       setCategories(previousCategories);
       toast.error("Failed to delete category");
+    } finally {
+      // Remove from deleting set
+      setDeletingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(categoryId);
+        return next;
+      });
     }
   };
 
   const handleDeleteConfirm = async () => {
     if (!categoryToDelete) return;
 
+    setIsDeleting(true); // Start loading
     try {
       await handleDeleteCategory(categoryToDelete.id);
       setCategoryToDelete(null);
     } catch (error) {
       console.error("Error deleting category:", error);
+    } finally {
+      setIsDeleting(false); // End loading
     }
   };
 
@@ -238,18 +283,10 @@ export function CategoryList() {
               value={newCategory}
               onChange={(e) => setNewCategory(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleAddCategory()}
-              disabled={isAdding}
             />
-            <Button
-              onClick={handleAddCategory}
-              disabled={!newCategory.trim() || isAdding}
-            >
-              {isAdding ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Plus className="h-4 w-4 mr-2" />
-              )}
-              {isAdding ? "Adding..." : "Add"}
+            <Button onClick={handleAddCategory} disabled={!newCategory.trim()}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add
             </Button>
           </div>
         </div>
@@ -276,6 +313,7 @@ export function CategoryList() {
                     handleToggleActive(category.id, isActive)
                   }
                   disabled={isLoading}
+                  isDeleting={deletingIds.has(category.id)}
                 />
               ))}
             </div>
@@ -328,11 +366,26 @@ export function CategoryList() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="ghost" onClick={() => setCategoryToDelete(null)}>
+            <Button
+              variant="ghost"
+              onClick={() => setCategoryToDelete(null)}
+              disabled={isDeleting}
+            >
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDeleteConfirm}>
-              Delete Category
+            <Button
+              variant="destructive"
+              onClick={handleDeleteConfirm}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Category"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
