@@ -41,7 +41,6 @@ import {
 export interface Category {
   id: string;
   name: string;
-  slug: string;
   index: number;
   is_active: boolean;
 }
@@ -178,10 +177,6 @@ export function CategoryList() {
     const optimisticCategory: Category = {
       id: tempId,
       name: newCategory.trim(),
-      slug: newCategory
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-"),
       index: categories.length,
       is_active: true,
     };

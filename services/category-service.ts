@@ -14,11 +14,6 @@ export const categoryService = {
 
     async addCategory(name: string) {
         const supabase = createClient();
-        const slug = name
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/(^-|-$)/g, "");
-
         // Get the highest index
         const { data: maxIndexData } = await supabase
             .from("categories")
@@ -35,7 +30,6 @@ export const categoryService = {
                 {
                     id: crypto.randomUUID(),
                     name: name.trim(),
-                    slug,
                     index: nextIndex,
                     is_active: true,
                 },

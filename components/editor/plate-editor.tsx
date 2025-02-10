@@ -21,7 +21,6 @@ export function PlateEditor({ initialContent, editorRef }: IProps) {
 
   // Assign the editor instance to the ref
   editorRef.current = editor;
-
   return (
     <DndProvider backend={HTML5Backend}>
       <Plate editor={editor}>

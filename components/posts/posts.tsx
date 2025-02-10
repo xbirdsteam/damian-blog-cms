@@ -1,60 +1,95 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { usePosts } from "@/hooks/use-posts";
+import { PostCard } from "./post-card";
 import { Plus } from "lucide-react";
 import Link from "next/link";
-import { PostList } from "./post-list";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
+import { PostSkeleton } from "./post-skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CategoryList } from "./category-list";
+import { PostStats } from "./post-stats";
 
 export default function Posts() {
-  const [activeTab, setActiveTab] = useState("posts");
+  const [currentPage, setCurrentPage] = useState(1);
+  const { posts, pagination, isLoading } = usePosts({
+    page: currentPage,
+    perPage: 12,
+  });
 
-  const renderHeader = () => {
-    return (
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">
-          {activeTab === "posts" ? "Posts" : "Categories"}
-        </h1>
-        {activeTab === "posts" ? (
-          <Link href="/cms/posts/create">
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Post
-            </Button>
-          </Link>
-        ) : null}
-      </div>
-    );
+  const handlePreviousPage = () => {
+    setCurrentPage((prev) => Math.max(prev - 1, 1));
+  };
+
+  const handleNextPage = () => {
+    setCurrentPage((prev) => Math.min(prev + 1, pagination.totalPages));
   };
 
   return (
-    <div className="space-y-4 px-6">
-      {renderHeader()}
-
-      <Tabs
-        defaultValue="posts"
-        className="w-full"
-        onValueChange={setActiveTab}
-      >
+    <Tabs defaultValue="posts" className="space-y-6">
+      <div className="flex justify-between items-center">
         <TabsList>
           <TabsTrigger value="posts">Posts</TabsTrigger>
           <TabsTrigger value="categories">Categories</TabsTrigger>
         </TabsList>
+        <Link href="/cms/posts/create">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            New Post
+          </Button>
+        </Link>
+      </div>
 
-        <TabsContent value="posts">
-          <div className="mt-4">
-            <PostList />
-          </div>
-        </TabsContent>
+      <TabsContent value="posts" className="space-y-6">
+        {/* Posts Grid */}
+        <PostStats />
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {isLoading ? (
+            // Show 12 skeleton cards while loading
+            <>
+              {Array.from({ length: 12 }).map((_, index) => (
+                <PostSkeleton key={index} />
+              ))}
+            </>
+          ) : posts.length > 0 ? (
+            posts.map((post) => <PostCard key={post.id} post={post} />)
+          ) : (
+            <div className="col-span-full text-center py-10 text-muted-foreground">
+              No posts found
+            </div>
+          )}
+        </div>
 
-        <TabsContent value="categories">
-          <div className="mt-4">
-            <CategoryList />
+        {/* Pagination */}
+        {!isLoading && posts.length > 0 && (
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              Page {pagination.currentPage} of {pagination.totalPages}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={handlePreviousPage}
+                disabled={currentPage === 1 || isLoading}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleNextPage}
+                disabled={currentPage >= pagination.totalPages || isLoading}
+              >
+                Next
+              </Button>
+            </div>
           </div>
-        </TabsContent>
-      </Tabs>
-    </div>
+        )}
+      </TabsContent>
+
+      <TabsContent value="categories">
+        <CategoryList />
+      </TabsContent>
+    </Tabs>
   );
 }

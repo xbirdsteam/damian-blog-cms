@@ -1,4 +1,4 @@
-import { getSettings, uploadLogo, updateFooter } from "@/services/settings-service";
+import { getSettings, uploadLogo, updateFooter, FooterSettings } from "@/services/settings-service";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -23,7 +23,7 @@ export function useSettings() {
     });
 
     const updateFooterMutation = useMutation({
-        mutationFn: updateFooter,
+        mutationFn: ({ id, settings }: { id: string, settings: FooterSettings }) => updateFooter(id, settings),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["settings"] });
             toast.success("Footer settings updated successfully");

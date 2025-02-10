@@ -10,10 +10,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PostCard } from "./post-card";
-import { PostCardSkeleton } from "./post-card-skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { usePosts } from "@/hooks/use-posts";
+import { PostSkeleton } from "./post-skeleton";
 
 export function PostList() {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -63,7 +63,7 @@ export function PostList() {
           // Show multiple skeleton cards while loading
           <>
             {Array.from({ length: 8 }).map((_, i) => (
-              <PostCardSkeleton key={i} />
+              <PostSkeleton key={i} />
             ))}
           </>
         ) : (

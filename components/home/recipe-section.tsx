@@ -43,6 +43,7 @@ export function RecipeSection({ form }: RecipeSectionProps) {
 
     return !!(
       dirtyFields.recipes?.title ||
+      dirtyFields.recipes?.heading ||
       dirtyFields.recipes?.description ||
       dirtyFields.recipes?.button_url ||
       recipeVideoFile
@@ -85,10 +86,11 @@ export function RecipeSection({ form }: RecipeSectionProps) {
 
       const recipeData = form.getValues("recipes");
       await handleSectionUpdate(data.id, "recipes", {
-        recipes_title: recipeData.title,
-        recipes_description: recipeData.description,
-        recipes_video_url: videoUrl,
-        recipes_more_url: recipeData.button_url,
+        recipe_title: recipeData.title,
+        recipe_heading: recipeData.heading,
+        recipe_description: recipeData.description,
+        recipe_video_url: videoUrl,
+        recipe_more_url: recipeData.button_url,
       });
 
       form.reset(form.getValues());
@@ -195,6 +197,24 @@ export function RecipeSection({ form }: RecipeSectionProps) {
               <FormControl>
                 <Input
                   placeholder="Enter section title"
+                  {...field}
+                  disabled={isSaving}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="recipes.heading"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Heading</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder="Enter recipe heading"
                   {...field}
                   disabled={isSaving}
                 />

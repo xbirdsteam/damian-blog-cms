@@ -57,9 +57,9 @@ export function PostCard({ post }: PostCardProps) {
         >
           {/* Featured Image */}
           <div className="relative w-full aspect-video bg-muted border-b">
-            {post.featured_image ? (
+            {post.post_img ? (
               <LoadingImage
-                src={post.featured_image}
+                src={post.post_img}
                 alt={post.title}
                 className="object-cover"
                 fill

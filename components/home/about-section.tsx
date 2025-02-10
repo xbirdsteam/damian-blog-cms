@@ -27,7 +27,6 @@ import { Loader2, Upload } from "lucide-react";
 import { useState } from "react";
 import { UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
-import * as z from "zod";
 import { FormValues } from "./types";
 
 interface AboutSectionProps {
@@ -89,7 +88,7 @@ export function AboutSection({ form }: AboutSectionProps) {
       await handleSectionUpdate(data.id, "about", {
         about_title: aboutData.title,
         about_description: aboutData.description,
-        about_image_url: imageUrl,
+        about_img_url: imageUrl,
         about_more_url: aboutData.button_url,
       });
 
@@ -208,6 +207,23 @@ export function AboutSection({ form }: AboutSectionProps) {
           )}
         />
 
+        <FormField
+          control={form.control}
+          name="about.about_bio"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Bio</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder="Enter your bio"
+                  {...field}
+                  disabled={isSaving}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <FormField
           control={form.control}
           name="about.description"

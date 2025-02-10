@@ -93,6 +93,7 @@ import { TableRowElement } from '@/components/plate-ui/table-row-element';
 import { TocElement } from '@/components/plate-ui/toc-element';
 import { ToggleElement } from '@/components/plate-ui/toggle-element';
 import { withDraggables } from '@/components/plate-ui/with-draggables';
+import { htmlToSlate } from '@slate-serializers/html';
 
 
 export const useCreateEditor = (initialContent?: string) => {

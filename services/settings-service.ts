@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/client";
+import { v4 as uuidv4 } from 'uuid';
 
 const supabase = createClient();
 
@@ -18,10 +19,12 @@ export interface FooterSettings {
     };
 }
 
-export interface Settings extends HeaderSettings, FooterSettings { }
+export interface Settings extends HeaderSettings, FooterSettings {
+    id: string;
+}
 
 export async function uploadLogo(file: File) {
-    const LOGO_PATH = 'settings/logo';
+    const LOGO_PATH = 'layouts/logo';
     const fileExt = file.name.substring(file.name.lastIndexOf('.'));
     const fileName = `${LOGO_PATH}${fileExt}`;
 
@@ -41,8 +44,11 @@ export async function uploadLogo(file: File) {
 
     // Update settings in database
     const { error } = await supabase
-        .from('settings')
-        .upsert({ logo_url: publicUrl, id: 1 }, { onConflict: 'id' })
+        .from('layouts')
+        .upsert({
+            logo_url: publicUrl,
+            id: uuidv4()
+        }, { onConflict: 'id' })
 
     if (error) throw error;
     return publicUrl;
@@ -50,7 +56,7 @@ export async function uploadLogo(file: File) {
 
 export async function getSettings() {
     const { data, error } = await supabase
-        .from('settings')
+        .from('layouts')
         .select('*')
         .single();
 
@@ -58,12 +64,12 @@ export async function getSettings() {
     return data as Settings;
 }
 
-export async function updateFooter(settings: FooterSettings) {
+export async function updateFooter(id: string, settings: FooterSettings) {
     const { error } = await supabase
-        .from('settings')
+        .from('layouts')
         .upsert({
             social_links: settings.social_links,
-            id: 1
+            id: id
         }, { onConflict: 'id' })
 
     if (error) throw error;

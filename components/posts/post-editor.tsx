@@ -1,6 +1,5 @@
 "use client";
 
-import { SeoSettingsModal } from "@/components/common/seo-settings-modal";
 import {
   Command,
   CommandEmpty,
@@ -33,6 +32,7 @@ import { cn } from "@/lib/utils";
 import { CreatePostOptions, Post, postService } from "@/services/post-service";
 import { uploadService } from "@/services/upload-service";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { slateToHtml, slateToHtmlConfig } from "@slate-serializers/html";
 import { PlateEditor } from "@udecode/plate-common/react";
 import {
   ArrowLeft,
@@ -57,15 +57,7 @@ const formSchema = z.object({
   shortDescription: z.string().min(1, "Short description is required"),
   content: z.any().optional(),
   categoryIds: z.array(z.string()).min(1, "At least one category is required"),
-  featuredImage: z.string().nullable().optional(),
-  seo: z
-    .object({
-      title: z.string().nullable().optional(),
-      description: z.string().nullable().optional(),
-      keywords: z.string().nullable().optional(),
-      og_image: z.string().nullable().optional(),
-    })
-    .nullable(),
+  postImg: z.string().nullable().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -77,7 +69,6 @@ interface PostEditorProps {
 
 export function PostEditor({ initialData, mode }: PostEditorProps) {
   const { categories } = useCategories();
-  const [isSavingSeo, setIsSavingSeo] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const editorRef = useRef<PlateEditor | null>(null);
   const { createPost, updatePost, isCreating, isUpdating } = usePosts();
@@ -95,30 +86,24 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
       shortDescription: initialData?.short_description || "",
       content: initialData?.content || "",
       categoryIds: initialCategoryIds,
-      featuredImage: initialData?.featured_image || null,
-      seo: initialData?.seo || {
-        title: "",
-        description: "",
-        keywords: "",
-        og_image: "",
-      },
+      postImg: initialData?.post_img || null,
     },
   });
 
-  const handleSeoSubmit = async (values: {
-    title: string;
-    description: string;
-    keywords: string;
-  }) => {
-    form.setValue("seo", values);
-    setIsSavingSeo(true);
-    // Update SEO in the database if editing an existing post
-    if (initialData?.id) {
-      await updatePost({ id: initialData.id, seo: values });
-      toast.success("SEO updated successfully");
-      setIsSavingSeo(false);
-    }
-  };
+  // const handleSeoSubmit = async (values: {
+  //   title: string;
+  //   description: string;
+  //   keywords: string;
+  // }) => {
+  //   form.setValue("seo", values);
+  //   setIsSavingSeo(true);
+  //   // Update SEO in the database if editing an existing post
+  //   if (initialData?.id) {
+  //     await updatePost({ id: initialData.id });
+  //     toast.success("SEO updated successfully");
+  //     setIsSavingSeo(false);
+  //   }
+  // };
 
   const handleFeaturedImageUpload = async (file: File) => {
     try {
@@ -127,12 +112,12 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
       const url = await uploadService.uploadImage(file, "posts/featured");
 
       // Update form state
-      form.setValue("featuredImage", url);
+      form.setValue("postImg", url);
 
       // If we're editing an existing post, update it in the database
       if (initialData?.id) {
         await postService.updatePost(initialData.id, {
-          featured_image: url,
+          post_img: url,
         });
       }
 
@@ -159,15 +144,16 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
   const onSubmit = async (values: FormValues, isDraft: boolean) => {
     try {
       const editorContent = editorRef.current?.children || [];
+
       const postData: CreatePostOptions = {
         categoryIds: values.categoryIds,
         status: isDraft ? "draft" : "published",
         content: editorContent,
-        featured_image: values.featuredImage || "",
-        seo: values.seo || null,
+        post_img: values.postImg || "",
         short_description: values.shortDescription,
+
         title: values.title,
-        slug: values.title,
+        slug: "",
       };
 
       if (!isDraft) {
@@ -210,7 +196,7 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
         </div>
 
         <div className="flex justify-between items-center">
-          <SeoSettingsModal
+          {/* <SeoSettingsModal
             defaultValues={{
               title: form.getValues("seo.title") || "",
               description: form.getValues("seo.description") || "",
@@ -222,7 +208,7 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
             pageName="Post"
             isSaving={isSavingSeo}
             showOgImage={false}
-          />
+          /> */}
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
@@ -366,7 +352,7 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
           {/* Featured Image */}
           <FormField
             control={form.control}
-            name="featuredImage"
+            name="postImg"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Featured Image</FormLabel>

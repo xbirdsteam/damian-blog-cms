@@ -1,4 +1,5 @@
 import { getAboutData, updateAboutData, updateSEO, updateTimelineItems, uploadProfileImage } from "@/services/about-service";
+import { AboutData, TimelineItem } from "@/types/about";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -11,7 +12,7 @@ export function useAboutData() {
     });
 
     const updateMutation = useMutation({
-        mutationFn: updateAboutData,
+        mutationFn: ({ id, updates }: { id: string, updates: Partial<AboutData> }) => updateAboutData(id, updates),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["about"] });
             toast.success("Changes saved successfully");
@@ -23,7 +24,7 @@ export function useAboutData() {
     });
 
     const uploadMutation = useMutation({
-        mutationFn: uploadProfileImage,
+        mutationFn: ({ id, file, path }: { id: string, file: File, path?: string }) => uploadProfileImage(id, file, path),
         onSuccess: () => {
             toast.success("Image uploaded successfully");
         },
@@ -34,7 +35,7 @@ export function useAboutData() {
     });
 
     const timelineMutation = useMutation({
-        mutationFn: updateTimelineItems,
+        mutationFn: ({ id, timelines }: { id: string, timelines: TimelineItem[] }) => updateTimelineItems(id, timelines),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["about"] });
             toast.success("Timeline updated successfully");

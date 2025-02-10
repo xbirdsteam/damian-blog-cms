@@ -6,29 +6,25 @@ export interface Post {
     id?: string;
     title: string;
     slug: string;
-    short_description: string;
-    content: any;
+    short_description: string | null;
+    content: string | null;
     posts_categories: {
         categories: {
             id: string;
             name: string;
         }
     }[];
-    categoryIds?: string[];
-    publish_date?: string | null | Date;
-    featured_image?: string | null;
+    post_img: string | null;
     status: "draft" | "published";
-    seo?: {
-        title?: string | null;
-        description?: string | null;
-        keywords?: string | null;
-    } | null;
+    publish_date: Date | null;
     created_at: string;
     updated_at: string;
 }
 
 interface GetPostsOptions {
     category?: string;
+    page?: number;
+    perPage?: number;
 }
 
 export interface CreatePostOptions {
@@ -36,14 +32,30 @@ export interface CreatePostOptions {
     status: "draft" | "published";
     title: string;
     slug: string;
-    short_description: string;
-    featured_image: string;
+    short_description: string | null;
+    post_img: string | null;
     content: any;
-    seo: {
-        title?: string | null;
-        description?: string | null;
-        keywords?: string | null;
-    } | null;
+}
+
+export interface PostStats {
+    totalPosts: number;
+    byStatus: {
+        published: number;
+        draft: number;
+    };
+    byCategory: {
+        categoryId: string;
+        categoryName: string;
+        count: number;
+    }[];
+}
+
+export interface PaginatedPosts {
+    posts: Post[];
+    total: number;
+    page: number;
+    perPage: number;
+    totalPages: number;
 }
 
 export const postService = {
@@ -84,7 +96,7 @@ export const postService = {
 
     async updatePost(id: string, updates: Partial<CreatePostOptions>) {
         const supabase = createClient();
-        const { seo, categoryIds, ...postData } = updates;
+        const { categoryIds, ...postData } = updates;
 
         // Start a transaction
         const { error: postError } = await supabase
@@ -93,10 +105,6 @@ export const postService = {
                 {
                     ...postData,
                     content: postData.content ? JSON.stringify(postData.content) : "",
-                    status: "draft",
-                    seo_title: seo?.title || null,
-                    seo_description: seo?.description || null,
-                    seo_keywords: seo?.keywords || null,
                     id
                 },
             ).eq("id", id)
@@ -130,11 +138,9 @@ export const postService = {
 
     async createPost(post: CreatePostOptions) {
         const supabase = createClient();
-        const { seo, categoryIds, ...postData } = post;
-
+        const { categoryIds, ...postData } = post;
         // Generate unique slug if title is provided and no slug exists
         const slug = postData.title && !postData.slug ? await this.generateSlug(postData.title) : postData.slug;
-
         // Start a transaction
         const { data: newPost, error: postError } = await supabase
             .from("posts")
@@ -143,10 +149,6 @@ export const postService = {
                     ...postData,
                     slug,
                     content: postData.content ? JSON.stringify(postData.content) : null,
-                    // Map SEO fields to database columns
-                    seo_title: seo?.title || null,
-                    seo_description: seo?.description || null,
-                    seo_keywords: seo?.keywords || null,
                 }
             )
             .select()
@@ -187,9 +189,27 @@ export const postService = {
             },
         };
     },
-    async getPosts(options: GetPostsOptions = {}) {
+    async getPosts(options: GetPostsOptions = {}): Promise<PaginatedPosts> {
         const supabase = createClient();
+        const page = options.page || 1;
+        const perPage = options.perPage || 2;
+        const from = (page - 1) * perPage;
+        const to = from + perPage - 1;
+
         try {
+            // First get total count
+            const countQuery = supabase
+                .from("posts")
+                .select('id', { count: 'exact' });
+
+            if (options.category) {
+                countQuery.eq('posts_categories.category_id', options.category);
+            }
+
+            const { count, error: countError } = await countQuery;
+            if (countError) throw countError;
+
+            // Then get paginated data
             let query = supabase
                 .from("posts")
                 .select(`
@@ -201,7 +221,8 @@ export const postService = {
                         )
                     )
                 `)
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .range(from, to);
 
             // Add category filter if specified
             if (options.category) {
@@ -211,8 +232,10 @@ export const postService = {
             const { data, error } = await query;
             if (error) throw error;
 
+            const totalPages = Math.ceil((count || 0) / perPage);
+
             // Transform the data to match our Post interface
-            return (data || []).map(post => ({
+            const posts = (data || []).map(post => ({
                 ...post,
                 content: post.content ? JSON.parse(post.content) : null,
                 seo: {
@@ -221,6 +244,14 @@ export const postService = {
                     keywords: post.seo_keywords || null,
                 }
             })) as Post[];
+
+            return {
+                posts,
+                total: count || 0,
+                page,
+                perPage,
+                totalPages,
+            };
         } catch (error) {
             console.error("Error fetching posts:", error);
             throw error;
@@ -273,4 +304,76 @@ export const postService = {
             throw error;
         }
     },
+    async getPostStats(): Promise<PostStats> {
+        const supabase = createClient();
+
+        // Fetch all categories first
+        const { data: categories, error: categoriesError } = await supabase
+            .from('categories')
+            .select('id, name');
+
+        if (categoriesError) throw categoriesError;
+
+        // Fetch posts with their categories
+        const { data: posts, error: postsError } = await supabase
+            .from('posts')
+            .select(`
+                id,
+                status,
+                posts_categories!inner (
+                    categories (
+                        id,
+                        name
+                    )
+                )
+            `);
+
+        if (postsError) throw postsError;
+
+        const stats: PostStats = {
+            totalPosts: posts.length,
+            byStatus: {
+                published: posts.filter(post => post.status === 'published').length,
+                draft: posts.filter(post => post.status === 'draft').length
+            },
+            byCategory: []
+        };
+
+        // Initialize counts for all categories
+        const categoryMap = new Map<string, { name: string; count: number }>();
+
+        // Initialize all categories with 0 count
+        categories.forEach(category => {
+            categoryMap.set(category.id, {
+                name: category.name,
+                count: 0
+            });
+        });
+
+        // Update counts for categories that have posts
+        posts.forEach((post: any) => {
+            post.posts_categories.forEach(pc => {
+                const { categories } = pc;
+                if (!categories) return;
+
+                const categoryId = categories.id;
+                const current = categoryMap.get(categoryId);
+
+                if (current) {
+                    current.count++;
+                }
+            });
+        });
+
+        // Convert map to array format
+        stats.byCategory = Array.from(categoryMap.entries())
+            .map(([categoryId, data]) => ({
+                categoryId,
+                categoryName: data.name,
+                count: data.count
+            }))
+            .sort((a, b) => b.count - a.count); // Sort by count in descending order
+
+        return stats;
+    }
 };

@@ -4,10 +4,11 @@ export interface TimelineItem {
 }
 
 export interface AboutData {
+    id: string;
     title: string;
     introduction: string;
     image_url: string | null;
-    timeline: TimelineItem[];
+    timelines: TimelineItem[];
     closing_paragraph: string;
     seo_title: string | null;
     seo_description: string | null;

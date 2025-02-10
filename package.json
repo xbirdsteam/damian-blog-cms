@@ -33,6 +33,7 @@
     "@radix-ui/react-tabs": "^1.1.2",
     "@radix-ui/react-toolbar": "^1.1.1",
     "@radix-ui/react-tooltip": "^1.1.6",
+    "@slate-serializers/html": "^2.2.3",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.8",
     "@tanstack/react-query": "^5.62.7",
@@ -112,6 +113,7 @@
     "tailwindcss-animate": "^1.0.7",
     "uploadthing": "7.2.0",
     "use-file-picker": "^2.1.2",
+    "uuid": "^11.0.3",
     "zod": "^3.24.1"
   },
   "devDependencies": {

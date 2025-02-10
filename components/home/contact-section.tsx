@@ -22,11 +22,13 @@ import { Input } from "@/components/ui/input";
 import { TagInput } from "@/components/ui/tag-input";
 import { Textarea } from "@/components/ui/textarea";
 import { useHomeSettings } from "@/hooks/use-home-settings";
-import { Loader2 } from "lucide-react";
-import { useState } from "react";
+import { Loader2, Plus, Trash } from "lucide-react";
+import { useState, useRef } from "react";
 import { UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
 import { FormValues } from "./types";
+import { PlateEditor } from "@/components/editor/plate-editor";
+import type { PlateEditor as PlateEditorType } from "@udecode/plate-common/react";
 
 interface ContactSectionProps {
   form: UseFormReturn<FormValues>;
@@ -36,13 +38,58 @@ export function ContactSection({ form }: ContactSectionProps) {
   const { data, isSaving, handleSectionUpdate } = useHomeSettings();
   const [updatingSection, setUpdatingSection] = useState<boolean>(false);
 
+  // Add editor ref
+  const editorRef = useRef<PlateEditorType | null>(null);
+
+  // Add state for managing paragraphs
+  const [paragraphs, setParagraphs] = useState<string[]>(() => {
+    const text = form.getValues("contact.text") || "";
+    return text ? text.split("\n") : [""];
+  });
+
+  // Handle adding new paragraph
+  const handleAddParagraph = () => {
+    setParagraphs([...paragraphs, ""]);
+    // Mark the field as dirty
+    form.setValue("contact.text", [...paragraphs, ""].join("\n"), {
+      shouldDirty: true,
+    });
+  };
+
+  // Handle removing paragraph
+  const handleRemoveParagraph = (index: number) => {
+    if (paragraphs.length > 1) {
+      const newParagraphs = paragraphs.filter((_, i) => i !== index);
+      setParagraphs(newParagraphs);
+      // Mark the field as dirty
+      form.setValue("contact.text", newParagraphs.join("\n"), {
+        shouldDirty: true,
+      });
+    }
+  };
+
+  // Handle paragraph content change
+  const handleParagraphChange = (index: number, value: string) => {
+    const newParagraphs = [...paragraphs];
+    newParagraphs[index] = value;
+    setParagraphs(newParagraphs);
+    // Mark the field as dirty
+    form.setValue("contact.text", newParagraphs.join("\n"), {
+      shouldDirty: true,
+    });
+  };
+
   const isContactFormDirty = () => {
     const dirtyFields = form.formState.dirtyFields;
 
     return !!(
       dirtyFields.contact?.title ||
+      dirtyFields.contact?.heading ||
+      dirtyFields.contact?.subheading ||
+      dirtyFields.contact?.text ||
       dirtyFields.contact?.description ||
       dirtyFields.contact?.receiver_email ||
+      dirtyFields.contact?.button_url ||
       dirtyFields.contact?.industries
     );
   };
@@ -54,6 +101,9 @@ export function ContactSection({ form }: ContactSectionProps) {
       setUpdatingSection(true);
 
       const contactData = form.getValues("contact");
+
+      // Join paragraphs with newline character
+      const textContent = paragraphs.join("\n");
 
       // Validate email format
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -69,12 +119,15 @@ export function ContactSection({ form }: ContactSectionProps) {
 
       await handleSectionUpdate(data.id, "contact", {
         contact_title: contactData.title,
+        contact_heading: contactData.heading,
+        contact_subheading: contactData.subheading,
+        contact_text: textContent,
         contact_description: contactData.description,
         contact_receiver_email: contactData.receiver_email,
-        contact_industries: industries,
+        contact_button_url: contactData.button_url,
+        contact_industry_options: industries,
       });
 
-      // Reset form with current values to clear dirty state
       form.reset(form.getValues());
       toast.success("Contact section updated successfully");
     } catch (error) {
@@ -116,7 +169,7 @@ export function ContactSection({ form }: ContactSectionProps) {
               <FormLabel>Title</FormLabel>
               <FormControl>
                 <Input
-                  placeholder="Enter contact section title"
+                  placeholder="Enter section title"
                   {...field}
                   disabled={isSaving}
                 />
@@ -134,7 +187,7 @@ export function ContactSection({ form }: ContactSectionProps) {
               <FormLabel>Description</FormLabel>
               <FormControl>
                 <Textarea
-                  placeholder="Enter contact section description"
+                  placeholder="Enter brief description"
                   {...field}
                   disabled={isSaving}
                   className="min-h-[100px]"
@@ -194,6 +247,114 @@ export function ContactSection({ form }: ContactSectionProps) {
             )}
           />
         </div>
+
+        <FormField
+          control={form.control}
+          name="contact.heading"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Heading</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder="Enter contact heading"
+                  {...field}
+                  disabled={isSaving}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="contact.subheading"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Subheading</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder="Enter contact subheading"
+                  {...field}
+                  disabled={isSaving}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="contact.text"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Text Content</FormLabel>
+              <FormControl>
+                <div className="space-y-4">
+                  {paragraphs.map((paragraph, index) => (
+                    <div key={index} className="flex gap-2">
+                      <Textarea
+                        value={paragraph}
+                        onChange={(e) =>
+                          handleParagraphChange(index, e.target.value)
+                        }
+                        placeholder={`Paragraph ${index + 1}`}
+                        disabled={isSaving}
+                        className="min-h-[100px]"
+                      />
+                      {paragraphs.length > 1 && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveParagraph(index)}
+                          disabled={isSaving}
+                        >
+                          <Trash className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleAddParagraph}
+                    disabled={isSaving}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Paragraph
+                  </Button>
+                </div>
+              </FormControl>
+              <FormDescription>
+                Add multiple paragraphs to your text content
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="contact.button_url"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Button URL</FormLabel>
+              <FormControl>
+                <Input
+                  placeholder="Enter button URL"
+                  {...field}
+                  disabled={isSaving}
+                />
+              </FormControl>
+              <FormDescription>
+                The URL where the contact button will link to
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
       </CardContent>
     </Card>
   );

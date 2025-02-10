@@ -17,52 +17,7 @@ import { AboutSection } from "./about-section";
 import { ContactSection } from "./contact-section";
 import { HeroSection } from "./hero-section";
 import { RecipeSection } from "./recipe-section";
-
-const heroSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  subtitle: z.string().min(1, "Subtitle is required"),
-  image_url: z.string(),
-  background: z.object({
-    desktop: z.string(),
-    mobile: z.string(),
-  }),
-});
-
-const aboutSchema = z.object({
-  image_url: z.string(),
-  title: z.string().min(1, "Title is required"),
-  description: z.string().min(1, "Description is required"),
-  button_url: z.string().url().optional().or(z.literal("")),
-});
-
-const recipeSchema = z.object({
-  video_url: z.string(),
-  title: z.string().min(1, "Title is required"),
-  description: z.string().min(1, "Description is required"),
-  button_url: z.string().url().optional().or(z.literal("")),
-});
-
-const contactSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  description: z.string().min(1, "Description is required"),
-  receiver_email: z.string().email("Invalid email address"),
-  industries: z.array(z.string()),
-});
-
-const seoSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  description: z.string().min(1, "Description is required"),
-  keywords: z.string().min(1, "Keywords are required"),
-  og_image: z.string(),
-});
-
-const formSchema = z.object({
-  hero: heroSchema,
-  about: aboutSchema,
-  recipes: recipeSchema,
-  contact: contactSchema,
-  seo: seoSchema,
-});
+import { formSchema, seoSchema } from "./types";
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -91,18 +46,24 @@ export function HomeEditor() {
         title: "",
         description: "",
         button_url: "",
+        about_bio: "",
       },
       recipes: {
         video_url: "",
         title: "",
         description: "",
         button_url: "",
+        heading: "",
       },
       contact: {
         title: "",
         description: "",
         receiver_email: "",
         industries: [],
+        button_url: "",
+        heading: "",
+        subheading: "",
+        text: "",
       },
       seo: {
         title: "",
@@ -124,27 +85,33 @@ export function HomeEditor() {
       form.reset({
         hero: {
           background: {
-            desktop: data.hero_image_url || "",
-            mobile: data.hero_mobile_image_url || "",
+            desktop: data.hero_desktop_img_url || "",
+            mobile: data.hero_mobile_img_url || "",
           },
         },
         about: {
           title: data.about_title || "",
           description: data.about_description || "",
-          image_url: data.about_image_url || "",
+          image_url: data.about_img_url || "",
           button_url: data.about_more_url || "",
+          about_bio: data.about_bio || "",
         },
         recipes: {
-          title: data.recipes_title || "",
-          description: data.recipes_description || "",
-          video_url: data.recipes_video_url || "",
-          button_url: data.recipes_more_url || "",
+          title: data.recipe_title || "",
+          description: data.recipe_description || "",
+          video_url: data.recipe_video_url || "",
+          button_url: data.recipe_more_url || "",
+          heading: data.recipe_heading || "",
         },
         contact: {
           title: data.contact_title || "",
           description: data.contact_description || "",
           receiver_email: data.contact_receiver_email || "",
-          industries: data.contact_industries || [],
+          industries: data.contact_industry_options || [],
+          heading: data.contact_heading || "",
+          subheading: data.contact_subheading || "",
+          text: data.contact_text || "",
+          button_url: data.contact_button_url || "",
         },
         seo: {
           title: data.seo_title || "",

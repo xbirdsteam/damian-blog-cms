@@ -17,26 +17,26 @@ export interface Project {
 
 export interface HomeSettings {
     id: string;
-    hero_image_url: string;
-    hero_mobile_image_url: string;
+    hero_desktop_img_url: string;
+    hero_mobile_img_url: string;
     about_title: string;
+    about_bio: string;
     about_description: string;
-    about_image_url: string;
+    about_img_url: string;
     about_more_url: string;
-    created_at: string;
-    updated_at: string;
-    recipes_title: string;
-    recipes_description: string;
-    recipes_video_url: string;
-    recipes_more_url: string;
+    recipe_title: string;
+    recipe_heading: string;
+    recipe_description: string;
+    recipe_video_url: string;
+    recipe_more_url: string;
     contact_title: string;
+    contact_heading: string;
+    contact_subheading: string;
+    contact_text: string;
     contact_description: string;
     contact_receiver_email: string;
-    contact_industries: string[];
-    seo_title: string;
-    seo_description: string;
-    seo_keywords: string;
-    og_image: string;
+    contact_button_url: string;
+    contact_industry_options: any[];
 }
 
 export interface UploadImageParams {
@@ -46,7 +46,7 @@ export interface UploadImageParams {
 
 export async function getHomeSettings() {
     const { data, error } = await supabase
-        .from('home_settings')
+        .from('home')
         .select('*')
         .single();
 
@@ -56,7 +56,7 @@ export async function getHomeSettings() {
 
 export async function updateHomeSettings(settings: HomeSettings) {
     const { error } = await supabase
-        .from('home_settings')
+        .from('home')
         .update(settings)
         .eq('id', 1);
 
@@ -101,7 +101,7 @@ export const homeService = {
     async getHomeSettings() {
         try {
             const { data, error } = await supabase
-                .from('home_settings')
+                .from('home')
                 .select('*')
                 .single();
 
@@ -123,29 +123,39 @@ export const homeService = {
 
     async createHomeSettings() {
         const { data, error } = await supabase
-            .from('home_settings')
+            .from('home')
             .insert({
-                hero_image_url: '',
-                hero_mobile_image_url: '',
+                hero_desktop_img_url: '',
+                hero_mobile_img_url: '',
                 about_title: '',
+                about_bio: '',
                 about_description: '',
-                about_image_url: '',
+                about_img_url: '',
                 about_more_url: '',
-                recipes_title: '',
-                recipes_description: '',
-                recipes_video_url: '',
-                recipes_more_url: '',
+                recipe_title: '',
+                recipe_heading: '',
+                recipe_description: '',
+                recipe_video_url: '',
+                recipe_more_url: '',
+                contact_title: '',
+                contact_heading: '',
+                contact_subheading: '',
+                contact_text: '',
+                contact_description: '',
+                contact_receiver_email: '',
+                contact_button_url: '',
+                contact_industry_options: [],
             })
             .select()
             .single();
-
+        console.log(error)
         if (error) throw error;
         return data;
     },
 
     async updateHomeImages(id: string, updates: Partial<HomeSettings>) {
         const { data, error } = await supabase
-            .from('home_settings')
+            .from('home')
             .update(updates)
             .eq('id', id)
             .select()
@@ -157,7 +167,7 @@ export const homeService = {
 
     async updateHomeSection(id: string, updates: Partial<HomeSettings>) {
         const { data, error } = await supabase
-            .from('home_settings')
+            .from('home')
             .update(updates)
             .eq('id', id)
             .select()

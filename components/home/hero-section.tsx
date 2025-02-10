@@ -153,12 +153,12 @@ export function HeroSection({ form }: HeroSectionProps) {
                 <FormItem>
                   <FormControl>
                     <div className="space-y-4">
-                      {(previewImage.desktop || data?.hero_image_url) && (
+                      {(previewImage.desktop || data?.hero_desktop_img_url) && (
                         <div className="relative aspect-[21/9] w-full overflow-hidden rounded-lg border">
                           <LoadingImage
                             src={
                               previewImage.desktop ||
-                              addCacheBuster(data?.hero_image_url)
+                              addCacheBuster(data?.hero_desktop_img_url)
                             }
                             alt="Desktop Background Preview"
                             className="object-cover"
@@ -186,7 +186,7 @@ export function HeroSection({ form }: HeroSectionProps) {
                           disabled={isSaving}
                         >
                           <Upload className="mr-2 h-4 w-4" />
-                          {data?.hero_image_url
+                          {data?.hero_desktop_img_url
                             ? "Change Desktop Background"
                             : "Choose Desktop Background"}
                         </Button>
@@ -232,12 +232,12 @@ export function HeroSection({ form }: HeroSectionProps) {
                 <FormItem>
                   <FormControl>
                     <div className="space-y-4">
-                      {(previewImage.mobile || data?.hero_mobile_image_url) && (
+                      {(previewImage.mobile || data?.hero_mobile_img_url) && (
                         <div className="relative aspect-[21/9] w-full overflow-hidden rounded-lg border">
                           <LoadingImage
                             src={
                               previewImage.mobile ||
-                              addCacheBuster(data?.hero_mobile_image_url)
+                              addCacheBuster(data?.hero_mobile_img_url)
                             }
                             alt="Mobile Background Preview"
                             fill
@@ -265,7 +265,7 @@ export function HeroSection({ form }: HeroSectionProps) {
                           disabled={isSaving}
                         >
                           <Upload className="mr-2 h-4 w-4" />
-                          {data?.hero_mobile_image_url
+                          {data?.hero_mobile_img_url
                             ? "Change Mobile Background"
                             : "Choose Mobile Background"}
                         </Button>

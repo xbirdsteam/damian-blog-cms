@@ -7,7 +7,7 @@ import { FooterSettings } from "./footer-settings";
 import { HeaderSettings } from "./header-settings";
 
 export function GlobalSettings() {
-  const { isLoading } = useSettings();
+  const { isLoading, data } = useSettings();
 
   if (isLoading) {
     return (
@@ -54,7 +54,7 @@ export function GlobalSettings() {
                 </p>
               </div>
             </div>
-            <FooterSettings />
+            <FooterSettings id={data?.id || ""} />
           </TabsContent>
         </div>
       </Tabs>

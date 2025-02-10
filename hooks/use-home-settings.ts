@@ -30,8 +30,8 @@ export const useHomeSettings = () => {
             setError(null);
 
             const updates = type === "desktop"
-                ? { hero_image_url: url }
-                : { hero_mobile_image_url: url };
+                ? { hero_desktop_img_url: url }
+                : { hero_mobile_img_url: url };
 
             await homeService.updateHomeImages(id, updates);
 

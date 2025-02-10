@@ -15,6 +15,7 @@ export const aboutSchema = z.object({
     title: z.string().min(1, "Title is required"),
     description: z.string().min(1, "Description is required"),
     button_url: z.string().url().optional().or(z.literal("")),
+    about_bio: z.string().min(1, "Bio is required"),
 });
 
 export const recipeSchema = z.object({
@@ -22,6 +23,7 @@ export const recipeSchema = z.object({
     title: z.string().min(1, "Title is required"),
     description: z.string().min(1, "Description is required"),
     button_url: z.string().url().optional().or(z.literal("")),
+    heading: z.string().min(1, "Heading is required"),
 });
 
 export const contactSchema = z.object({
@@ -29,6 +31,10 @@ export const contactSchema = z.object({
     description: z.string().min(1, "Description is required"),
     receiver_email: z.string().email("Invalid email address"),
     industries: z.array(z.string()),
+    heading: z.string().min(1, "Heading is required"),
+    subheading: z.string().min(1, "Subheading is required"),
+    text: z.string().min(1, "Text is required"),
+    button_url: z.string().url().optional().or(z.literal("")),
 });
 
 export const seoSchema = z.object({

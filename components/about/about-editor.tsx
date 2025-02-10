@@ -12,6 +12,7 @@ import { TimelineDialog } from "./timeline-dialog";
 import { ImageDialog } from "./image-dialog";
 import { SeoSettingsModal } from "@/components/common/seo-settings-modal";
 import * as z from "zod";
+import { v4 as uuidv4 } from "uuid";
 
 // Add SEO schema
 const seoSchema = z.object({
@@ -33,23 +34,32 @@ export function AboutEditor() {
   const [editingSection, setEditingSection] = useState<string | null>(null);
 
   const handleUpdateTitle = async (newTitle: string) => {
-    await updateData({ title: newTitle });
+    await updateData({
+      id: data?.id || uuidv4(),
+      updates: { title: newTitle },
+    });
   };
 
   const handleUpdateIntroduction = async (newIntro: string) => {
-    await updateData({ introduction: newIntro });
+    await updateData({
+      id: data?.id || uuidv4(),
+      updates: { introduction: newIntro },
+    });
   };
 
   const handleUpdateTimeline = async (newTimeline: TimelineItem[]) => {
-    await updateTimeline(newTimeline);
+    await updateTimeline({ id: data?.id || uuidv4(), timelines: newTimeline });
   };
 
   const handleUpdateClosing = async (newClosing: string) => {
-    await updateData({ closing_paragraph: newClosing });
+    await updateData({
+      id: data?.id || uuidv4(),
+      updates: { closing_paragraph: newClosing },
+    });
   };
 
   const handleUploadImage = async (file: File) => {
-    await uploadImage(file);
+    await uploadImage(data?.id || uuidv4(), file, "about/profile");
   };
 
   const handleSeoSubmit = async (values: z.infer<typeof seoSchema>) => {
@@ -66,7 +76,11 @@ export function AboutEditor() {
   };
 
   const handleSeoImageUpload = async (file: File) => {
-    const url = await uploadImage(file, "about/seo/og-image");
+    const url = await uploadImage(
+      data?.id || uuidv4(),
+      file,
+      "about/seo/og-image"
+    );
     return url;
   };
 
@@ -202,7 +216,7 @@ export function AboutEditor() {
             </div>
             <div className="relative space-y-6">
               <div className="absolute left-3 top-4 bottom-4 w-px bg-gradient-to-b from-primary/20 via-primary to-primary/20" />
-              {data?.timeline?.map((item) => (
+              {data?.timelines?.map((item) => (
                 <div
                   key={item.year}
                   className="group/item relative pl-10 transition-all hover:pl-12 duration-300"
@@ -273,7 +287,7 @@ export function AboutEditor() {
       <TimelineDialog
         open={editingSection === "timeline"}
         onOpenChange={(open) => !open && setEditingSection(null)}
-        items={data?.timeline ?? []}
+        items={data?.timelines ?? []}
         onSave={handleUpdateTimeline}
       />
       <ImageDialog

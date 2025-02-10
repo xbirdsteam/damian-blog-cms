@@ -23,6 +23,7 @@ import { Globe, Instagram, Linkedin, Loader2, Youtube } from "lucide-react";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
+import { v4 as uuidv4 } from "uuid";
 
 const formSchema = z.object({
   social_links: z.object({
@@ -44,7 +45,11 @@ const socialIcons: Record<SocialPlatform, JSX.Element> = {
   website: <Globe className="h-4 w-4" />,
 };
 
-export function FooterSettings() {
+interface IProps {
+  id: string;
+}
+
+export function FooterSettings({ id }: IProps) {
   const { data, updateFooter, isSavingFooter } = useSettings();
 
   const form = useForm<FormValues>({
@@ -73,7 +78,10 @@ export function FooterSettings() {
   }, [data, form]);
 
   const onSubmit = async (values: FormValues) => {
-    await updateFooter(values);
+    await updateFooter({
+      id: id || uuidv4(),
+      settings: values,
+    });
   };
 
   return (

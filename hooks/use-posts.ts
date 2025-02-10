@@ -1,63 +1,90 @@
-import { CreatePostOptions, Post, postService } from "@/services/post-service";
+'use client'
+import { CreatePostOptions, PaginatedPosts, Post, postService, PostStats } from "@/services/post-service";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+
+// Separate hook for stats to avoid duplicate queries
+export function usePostStats() {
+    return useQuery<PostStats>({
+        queryKey: ["posts-stats"],
+        queryFn: () => postService.getPostStats(),
+        staleTime: 1000 * 60 * 5, // 5 minutes
+        gcTime: 1000 * 60 * 15,   // 15 minutes
+    });
+}
 
 interface UsePostsOptions {
     category?: string;
     enabled?: boolean;
+    page?: number;
+    perPage?: number;
 }
 
 export function usePosts(options: UsePostsOptions = {}) {
     const queryClient = useQueryClient();
-    const queryKey = ["posts", { category: options.category }];
+    const queryKey = ["posts", { category: options.category, page: options.page || 1 }];
 
     const {
-        data: posts = [],
+        data: paginatedPosts,
         isLoading,
         refetch,
-    } = useQuery<Post[]>({
+    } = useQuery<PaginatedPosts>({
         queryKey,
-        queryFn: () => postService.getPosts({ category: options.category }),
+        queryFn: () => postService.getPosts({
+            category: options.category,
+            page: options.page || 1,
+            perPage: options.perPage || 12
+        }),
         enabled: options.enabled !== false,
-        staleTime: 1000 * 60 * 5, // Consider data fresh for 5 minutes
-        gcTime: 1000 * 60 * 15, // Keep unused data in cache for 15 minutes
+        staleTime: 1000 * 60 * 5,
+        gcTime: 1000 * 60 * 15,
     });
 
-    // Create post mutation
+    // Mutations
     const { mutateAsync: createPost, isPending: isCreating } = useMutation({
         mutationFn: (newPost: CreatePostOptions) => postService.createPost(newPost),
         onSuccess: () => {
-            // Invalidate all posts queries to refetch fresh data
             queryClient.invalidateQueries({
                 queryKey: ["posts"]
+            });
+            queryClient.invalidateQueries({
+                queryKey: ["posts-stats"]
             });
         },
     });
 
-    // Update post mutation  
     const { mutateAsync: updatePost, isPending: isUpdating } = useMutation({
         mutationFn: ({ id, ...updates }: Partial<CreatePostOptions> & { id: string }) =>
             postService.updatePost(id, updates),
         onSuccess: () => {
-            // Invalidate all posts queries to refetch fresh data
             queryClient.invalidateQueries({
                 queryKey: ["posts"]
+            });
+            queryClient.invalidateQueries({
+                queryKey: ["posts-stats"]
             });
         },
     });
 
-    // Delete post mutation
     const { mutateAsync: deletePost, isPending: isDeleting } = useMutation({
         mutationFn: (postId: string) => postService.deletePost(postId),
         onSuccess: () => {
-            // Invalidate all posts queries to refetch fresh data
             queryClient.invalidateQueries({
                 queryKey: ["posts"]
+            });
+            queryClient.invalidateQueries({
+                queryKey: ["posts-stats"]
             });
         },
     });
 
     return {
-        posts,
+        posts: paginatedPosts?.posts || [],
+        pagination: {
+            currentPage: paginatedPosts?.page || 1,
+            totalPages: paginatedPosts?.totalPages || 0,
+            total: paginatedPosts?.total || 0,
+            perPage: paginatedPosts?.perPage || 12,
+        },
         isLoading,
         isCreating,
         isUpdating,
