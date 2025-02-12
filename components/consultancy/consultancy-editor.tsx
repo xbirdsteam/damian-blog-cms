@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -9,412 +10,484 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { LoadingImage } from "@/components/ui/loading-image";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useConsultancyContent } from "@/hooks/use-consultancy";
 import {
+  ConsultancyContent,
+  WhyWorkWithUsItem,
+  ProcessStep,
   consultancyService,
-  ContentBlock,
-  ListItem,
 } from "@/services/consultancy-service";
-import { ImageIcon, Loader2, Plus, Save, Upload, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Loader2, Plus, Save, Trash2, ImageIcon, X } from "lucide-react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { ConsultancyEditorSkeleton } from "./consultancy-editor-skeleton";
+import { SeoSettingsModal } from "@/components/common/seo-settings-modal";
+import { useSEO } from "@/hooks/use-seo";
+import { seoSchema } from "../home/types";
+import { v4 as uuidv4 } from "uuid";
+import * as z from "zod";
 
 export function ConsultancyEditor() {
   const { content, isLoading, isSaving, saveContent } = useConsultancyContent();
-  const [blocks, setBlocks] = useState<ContentBlock[]>([]);
-  const [featuredImage, setFeaturedImage] = useState<string | null>(null);
-  const [initialized, setInitialized] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Initialize state from content when it loads
-  useEffect(() => {
-    if (content && !initialized) {
-      const parsedContent =
-        typeof content.content === "string"
-          ? JSON.parse(content.content)
-          : content.content;
-
-      setBlocks(parsedContent || []);
-      setFeaturedImage(content.image || content.featured_image);
-      setInitialized(true);
-    }
-  }, [content, initialized]);
-
-  const addBlock = () => {
-    const newBlock: ContentBlock = {
-      id: Date.now().toString(),
+  const [data, setData] = useState<ConsultancyContent>({
+    title: "",
+    description: "",
+    headParagraph: {
+      title: "",
+      content: "",
+    },
+    whyWorkWithUs: [],
+    processSteps: [],
+    image_url: null,
+    callToAction: {
       title: "",
       description: "",
-      listType: "bullet",
-      listItems: [],
-    };
+    },
+  });
 
-    const newBlocks = [...blocks, newBlock];
-    setBlocks(newBlocks);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
-    // Save immediately to ensure we have a record
-    saveContent({
-      id: content?.id,
-      image: featuredImage,
-      content: newBlocks,
+  const seoRefId = content?.id || uuidv4();
+  const {
+    seoConfig,
+    updateSEO,
+    isUpdating: isUpdatingSEO,
+  } = useSEO(seoRefId, "consultancy");
+
+  useEffect(() => {
+    if (content) {
+      setData({
+        title: content.title,
+        description: content.description,
+        headParagraph: {
+          title: content.headParagraph.title,
+          content: content.headParagraph.content,
+        },
+        whyWorkWithUs: content.whyWorkWithUs,
+        processSteps: content.processSteps,
+        image_url: content.image_url,
+        callToAction: content.callToAction,
+      });
+    }
+  }, [content]);
+
+  const addWhyWorkWithUsItem = () => {
+    setData({
+      ...data,
+      whyWorkWithUs: [
+        ...data.whyWorkWithUs,
+        { id: crypto.randomUUID(), content: "" },
+      ],
     });
   };
 
-  const removeBlock = (blockId: string) => {
-    setBlocks(blocks.filter((block) => block.id !== blockId));
+  const removeWhyWorkWithUsItem = (id: string) => {
+    setData({
+      ...data,
+      whyWorkWithUs: data.whyWorkWithUs.filter((item) => item.id !== id),
+    });
   };
 
-  const updateBlock = (blockId: string, updates: Partial<ContentBlock>) => {
-    setBlocks(
-      blocks.map((block) =>
-        block.id === blockId ? { ...block, ...updates } : block
-      )
-    );
+  const updateWhyWorkWithUsItem = (id: string, value: string) => {
+    setData({
+      ...data,
+      whyWorkWithUs: data.whyWorkWithUs.map((item) =>
+        item.id === id ? { ...item, content: value } : item
+      ),
+    });
   };
 
-  const addListItem = (blockId: string) => {
-    const newItem: ListItem = {
-      id: Date.now().toString(),
-      title: "",
-      content: "",
-    };
-
-    setBlocks(
-      blocks.map((block) =>
-        block.id === blockId
-          ? { ...block, listItems: [...block.listItems, newItem] }
-          : block
-      )
-    );
+  const addProcessStep = () => {
+    setData({
+      ...data,
+      processSteps: [
+        ...data.processSteps,
+        { id: crypto.randomUUID(), title: "", description: "" },
+      ],
+    });
   };
 
-  const updateListItem = (
-    blockId: string,
-    itemId: string,
-    updates: Partial<ListItem>
+  const removeProcessStep = (id: string) => {
+    setData({
+      ...data,
+      processSteps: data.processSteps.filter((step) => step.id !== id),
+    });
+  };
+
+  const updateProcessStep = (
+    id: string,
+    field: keyof ProcessStep,
+    value: string
   ) => {
-    setBlocks(
-      blocks.map((block) =>
-        block.id === blockId
-          ? {
-              ...block,
-              listItems: block.listItems.map((item) =>
-                item.id === itemId ? { ...item, ...updates } : item
-              ),
-            }
-          : block
-      )
-    );
+    setData({
+      ...data,
+      processSteps: data.processSteps.map((step) =>
+        step.id === id ? { ...step, [field]: value } : step
+      ),
+    });
   };
 
-  const removeListItem = (blockId: string, itemId: string) => {
-    setBlocks(
-      blocks.map((block) =>
-        block.id === blockId
-          ? {
-              ...block,
-              listItems: block.listItems.filter((item) => item.id !== itemId),
-            }
-          : block
-      )
-    );
-  };
-
-  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const handleImageUpload = async (file: File) => {
     try {
-      setIsUploading(true);
-      const { url } = await consultancyService.uploadImage(file);
-      setFeaturedImage(url);
+      setIsUploadingImage(true);
+      const url = await consultancyService.uploadImage(file);
+      setData({ ...data, image_url: url });
       toast.success("Image uploaded successfully");
     } catch (error) {
       console.error("Error uploading image:", error);
       toast.error("Failed to upload image");
     } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleImageRemove = async () => {
-    try {
-      await consultancyService.deleteImage();
-      setFeaturedImage(null);
-      toast.success("Image removed successfully");
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    } catch (error) {
-      console.error("Error removing image:", error);
-      toast.error("Failed to remove image");
+      setIsUploadingImage(false);
     }
   };
 
   const handleSave = async () => {
     try {
-      await saveContent({
-        id: content?.id,
-        image: featuredImage,
-        content: blocks,
-      });
+      await saveContent(data);
+      toast.success("Content saved successfully");
     } catch (error) {
       console.error("Error saving content:", error);
-      toast.error("Failed to save changes");
+      toast.error("Failed to save content");
+    }
+  };
+
+  const handleSeoSubmit = async (values: z.infer<typeof seoSchema>) => {
+    try {
+      const payload: any = {
+        seo_ref_id: seoRefId,
+        meta_title: values.title,
+        meta_description: values.description,
+        meta_keywords: values.keywords,
+        og_image: values.og_image || null,
+        slug: "consultancy",
+      };
+
+      if (seoConfig?.id) {
+        payload.id = seoConfig.id;
+      }
+
+      await updateSEO(payload);
+    } catch (error) {
+      console.error("Error updating SEO settings:", error);
+    }
+  };
+
+  const handleSeoImageUpload = async (file: File) => {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("path", "consultancy/seo/og-image");
+
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error("Failed to upload image");
+
+      const { url } = await response.json();
+      return url;
+    } catch (error) {
+      console.error("Error uploading SEO image:", error);
+      throw error;
     }
   };
 
   if (isLoading) {
-    return <ConsultancyEditorSkeleton />;
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <div className="text-muted-foreground">Loading...</div>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
-      {/* Featured Image Card */}
+      <div className="flex items-center border-b pb-4">
+        <SeoSettingsModal
+          defaultValues={{
+            title: seoConfig?.meta_title || "",
+            description: seoConfig?.meta_description || "",
+            keywords: seoConfig?.meta_keywords || "",
+            og_image: seoConfig?.og_image || "",
+          }}
+          onSubmit={handleSeoSubmit}
+          onImageUpload={handleSeoImageUpload}
+          isSaving={isUpdatingSEO}
+          pageName="Consultancy"
+        />
+      </div>
+
+      {/* Image Upload Card - Moved to top */}
       <Card>
         <CardHeader>
-          <CardTitle>Featured Image</CardTitle>
+          <CardTitle>Page Image</CardTitle>
           <CardDescription>
-            Upload an image to be displayed at the top of your consultancy page.
-            Recommended size: 1920x1080px
+            Upload an image for your consultancy page
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="relative rounded-lg border-2 border-dashed p-4">
-            {featuredImage ? (
-              <div className="relative group">
-                <div className="aspect-video relative rounded-lg overflow-hidden">
-                  <LoadingImage
-                    src={featuredImage}
-                    alt="Featured image"
-                    fill
-                    className="object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <Upload className="mr-2 h-4 w-4" />
-                      Change
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={handleImageRemove}
-                    >
-                      <X className="mr-2 h-4 w-4" />
-                      Remove
-                    </Button>
-                  </div>
-                </div>
+          <div className="flex items-center gap-4">
+            {data.image_url ? (
+              <div className="relative">
+                <img
+                  src={data.image_url}
+                  alt="Consultancy"
+                  className="h-40 w-40 object-cover rounded-lg"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute -top-2 -right-2"
+                  onClick={() => setData({ ...data, image_url: null })}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
             ) : (
-              <div
-                className="aspect-video flex flex-col items-center justify-center gap-4 bg-muted/50 rounded-lg cursor-pointer"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <div className="p-4 rounded-full bg-primary/10">
-                  <ImageIcon className="h-8 w-8 text-primary" />
-                </div>
-                <div className="text-center">
-                  <p className="font-medium">Click to upload image</p>
-                  <p className="text-sm text-muted-foreground">
-                    SVG, PNG, JPG or GIF (Max. 5MB)
-                  </p>
-                </div>
-                {isUploading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-lg">
-                    <Loader2 className="h-8 w-8 animate-spin text-white" />
-                  </div>
-                )}
+              <div className="flex h-40 w-40 items-center justify-center rounded-lg border border-dashed">
+                <ImageIcon className="h-8 w-8 text-muted-foreground" />
               </div>
             )}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleImageSelect}
-              className="hidden"
-              id="featured-image-upload"
+            <div className="flex-1">
+              <input
+                type="file"
+                id="image"
+                className="hidden"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleImageUpload(file);
+                }}
+              />
+              <Button
+                variant="outline"
+                disabled={isUploadingImage}
+                onClick={() => document.getElementById("image")?.click()}
+              >
+                {isUploadingImage ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <ImageIcon className="mr-2 h-4 w-4" />
+                    Upload Image
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Main Content Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Main Content</CardTitle>
+          <CardDescription>
+            Edit the main content of your consultancy page
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Title</label>
+            <Input
+              value={data.title}
+              onChange={(e) => setData({ ...data, title: e.target.value })}
+              placeholder="Enter page title"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Description</label>
+            <Textarea
+              value={data.description}
+              onChange={(e) =>
+                setData({ ...data, description: e.target.value })
+              }
+              placeholder="Enter page description"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Head Paragraph</label>
+            <Input
+              value={data.headParagraph.title}
+              onChange={(e) =>
+                setData({
+                  ...data,
+                  headParagraph: {
+                    ...data.headParagraph,
+                    title: e.target.value,
+                  },
+                })
+              }
+              placeholder="Enter head paragraph title"
+            />
+            <Textarea
+              value={data.headParagraph.content}
+              onChange={(e) =>
+                setData({
+                  ...data,
+                  headParagraph: {
+                    ...data.headParagraph,
+                    content: e.target.value,
+                  },
+                })
+              }
+              placeholder="Enter head paragraph content"
             />
           </div>
         </CardContent>
       </Card>
 
-      {/* Content Blocks Card */}
+      {/* Why Work With Us Card */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>Content Blocks</CardTitle>
-            <CardDescription>Add and manage content sections</CardDescription>
+            <CardTitle>Why Work With Us</CardTitle>
+            <CardDescription>
+              Add reasons to work with your consultancy
+            </CardDescription>
           </div>
-          <Button onClick={addBlock} size="sm">
+          <Button onClick={addWhyWorkWithUsItem}>
             <Plus className="mr-2 h-4 w-4" />
-            Add Block
+            Add Reason
           </Button>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {blocks.map((block, blockIndex) => (
-            <Card
-              key={block.id}
-              className="relative border-dashed hover:border-border"
+        <CardContent className="space-y-4">
+          {data.whyWorkWithUs.map((item, index) => (
+            <div
+              key={item.id}
+              className="relative space-y-2 p-4 border rounded-lg group"
             >
-              {/* Block Number Badge */}
               <div className="absolute -left-2 -top-2 h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium">
-                {blockIndex + 1}
+                {index + 1}
               </div>
-
-              <CardContent className="space-y-6 pt-6">
-                {/* Block Header */}
-                <div className="flex items-center justify-between gap-4 pb-4 border-b">
-                  <Input
-                    placeholder="Block Title"
-                    value={block.title}
-                    onChange={(e) =>
-                      updateBlock(block.id, { title: e.target.value })
-                    }
-                    className="text-lg font-medium"
-                  />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => removeBlock(block.id)}
-                    className="text-muted-foreground hover:text-destructive"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                {/* Block Description */}
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-muted-foreground">
-                    Description
-                  </label>
-                  <Textarea
-                    placeholder="Description after title..."
-                    value={block.description}
-                    onChange={(e) =>
-                      updateBlock(block.id, { description: e.target.value })
-                    }
-                    className="min-h-[100px] resize-y"
-                  />
-                </div>
-
-                {/* List Section */}
-                <div className="space-y-4 pt-4 border-t">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <Select
-                        value={block.listType}
-                        onValueChange={(value: "bullet" | "numbered") =>
-                          updateBlock(block.id, { listType: value })
-                        }
-                      >
-                        <SelectTrigger className="w-[180px]">
-                          <SelectValue placeholder="List Type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="bullet">Bullet List</SelectItem>
-                          <SelectItem value="numbered">
-                            Numbered List
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <span className="text-sm text-muted-foreground">
-                        {block.listItems.length} items
-                      </span>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => addListItem(block.id)}
-                    >
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add List Item
-                    </Button>
-                  </div>
-
-                  <div className="space-y-3 pl-4">
-                    {block.listItems.map((item, index) => (
-                      <div
-                        key={item.id}
-                        className="group relative rounded-lg border bg-card hover:bg-accent/50 transition-colors"
-                      >
-                        <div className="absolute -left-6 top-4 text-sm font-medium text-muted-foreground">
-                          {block.listType === "numbered"
-                            ? `${index + 1}.`
-                            : "•"}
-                        </div>
-                        <div className="p-4 space-y-3">
-                          <div className="flex items-center gap-2">
-                            <Input
-                              placeholder="Item Title"
-                              value={item.title}
-                              onChange={(e) =>
-                                updateListItem(block.id, item.id, {
-                                  title: e.target.value,
-                                })
-                              }
-                              className="font-medium"
-                            />
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeListItem(block.id, item.id)}
-                              className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                          <Textarea
-                            placeholder="Item Content"
-                            value={item.content}
-                            onChange={(e) =>
-                              updateListItem(block.id, item.id, {
-                                content: e.target.value,
-                              })
-                            }
-                            className="min-h-[80px]"
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-
-          {blocks.length === 0 && (
-            <div className="text-center py-12 border-2 border-dashed rounded-lg">
-              <div className="text-muted-foreground space-y-2">
-                <p>No content blocks yet</p>
-                <p className="text-sm">
-                  Click &quot;Add Block&quot; to get started
-                </p>
+              <div className="flex gap-2">
+                <Textarea
+                  value={item.content}
+                  onChange={(e) =>
+                    updateWhyWorkWithUsItem(item.id, e.target.value)
+                  }
+                  placeholder="Enter reason"
+                  className="flex-1"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeWhyWorkWithUsItem(item.id)}
+                  className="opacity-0 group-hover:opacity-100"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
             </div>
-          )}
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Process Steps Card */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Our 3-Step Process</CardTitle>
+            <CardDescription>Define your consultation process</CardDescription>
+          </div>
+          <Button
+            onClick={addProcessStep}
+            disabled={data.processSteps.length >= 3}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Step
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {data.processSteps.map((step, index) => (
+            <div
+              key={step.id}
+              className="relative space-y-2 p-4 border rounded-lg group"
+            >
+              <div className="absolute -left-2 -top-2 h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-medium">
+                {index + 1}
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={step.title}
+                  onChange={(e) =>
+                    updateProcessStep(step.id, "title", e.target.value)
+                  }
+                  placeholder="Enter step title"
+                  className="flex-1"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeProcessStep(step.id)}
+                  className="opacity-0 group-hover:opacity-100"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+              <Textarea
+                value={step.description}
+                onChange={(e) =>
+                  updateProcessStep(step.id, "description", e.target.value)
+                }
+                placeholder="Enter step description"
+              />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {/* Call to Action Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Call to Action</CardTitle>
+          <CardDescription>
+            Edit the call to action section at the bottom of the page
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Title</label>
+            <Input
+              value={data.callToAction.title}
+              onChange={(e) =>
+                setData({
+                  ...data,
+                  callToAction: {
+                    ...data.callToAction,
+                    title: e.target.value,
+                  },
+                })
+              }
+              placeholder="Enter call to action title"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Description</label>
+            <Textarea
+              value={data.callToAction.description}
+              onChange={(e) =>
+                setData({
+                  ...data,
+                  callToAction: {
+                    ...data.callToAction,
+                    description: e.target.value,
+                  },
+                })
+              }
+              placeholder="Enter call to action description"
+            />
+          </div>
         </CardContent>
       </Card>
 
       {/* Save Button */}
       <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={isSaving || blocks.length === 0}>
+        <Button onClick={handleSave} disabled={isSaving}>
           {isSaving ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

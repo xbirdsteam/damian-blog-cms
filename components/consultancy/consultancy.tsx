@@ -7,15 +7,7 @@ import { ConsultancySuccess } from "./consultancy-success";
 
 export default function Consultancy() {
   return (
-    <div className="max-w-5xl mx-auto space-y-8">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold">Consultancy Page</h1>
-        <p className="text-muted-foreground">
-          Manage your consultancy page content and forms
-        </p>
-      </div>
-
+    <div className="relative mx-auto space-y-12 px-2 sm:px-4 pb-12 md:space-y-24 md:pb-24">
       <Tabs defaultValue="content" className="space-y-6">
         <TabsList>
           <TabsTrigger value="content">Content Editor</TabsTrigger>

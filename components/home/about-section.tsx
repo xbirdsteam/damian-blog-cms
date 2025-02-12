@@ -39,17 +39,6 @@ export function AboutSection({ form }: AboutSectionProps) {
   const [aboutImagePreview, setAboutImagePreview] = useState<string>("");
   const [updatingSection, setUpdatingSection] = useState<boolean>(false);
 
-  const isAboutFormDirty = () => {
-    const dirtyFields = form.formState.dirtyFields;
-
-    return !!(
-      dirtyFields.about?.title ||
-      dirtyFields.about?.description ||
-      dirtyFields.about?.button_url ||
-      aboutImageFile
-    );
-  };
-
   const handleAboutImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -64,7 +53,7 @@ export function AboutSection({ form }: AboutSectionProps) {
   };
 
   const handleAboutUpdate = async () => {
-    if (!data?.id || !isAboutFormDirty()) return;
+    if (!data?.id) return;
 
     try {
       setUpdatingSection(true);
@@ -90,6 +79,7 @@ export function AboutSection({ form }: AboutSectionProps) {
         about_description: aboutData.description,
         about_img_url: imageUrl,
         about_more_url: aboutData.button_url,
+        about_bio: aboutData.about_bio,
       });
 
       form.reset(form.getValues());
@@ -114,7 +104,7 @@ export function AboutSection({ form }: AboutSectionProps) {
         <Button
           type="button"
           onClick={handleAboutUpdate}
-          disabled={!isAboutFormDirty() || isSaving || updatingSection}
+          disabled={isSaving || updatingSection}
         >
           {updatingSection ? (
             <>

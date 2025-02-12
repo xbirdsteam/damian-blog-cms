@@ -47,7 +47,6 @@ export function PostCard({ post }: PostCardProps) {
       setShowDeleteDialog(false);
     }
   };
-
   return (
     <>
       <Link href={`/cms/posts/${post.id}`}>
@@ -81,7 +80,7 @@ export function PostCard({ post }: PostCardProps) {
           {/* Content */}
           <div className="p-6 space-y-4 flex-1 flex flex-col">
             <div className="space-y-2 flex-1">
-              <h3 className="font-semibold text-xl line-clamp-2 leading-tight">
+              <h3 className="font-semibold text-xl line-clamp-2 leading-tight min-h-[50px]">
                 {post.title}
               </h3>
               <p className="text-sm text-muted-foreground line-clamp-2">

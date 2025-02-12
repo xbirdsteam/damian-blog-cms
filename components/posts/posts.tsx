@@ -1,22 +1,38 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useCategories } from "@/hooks/use-categories";
+import { useDebounce } from "@/hooks/use-debounce";
 import { usePosts } from "@/hooks/use-posts";
-import { PostCard } from "./post-card";
 import { Plus } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
-import { PostSkeleton } from "./post-skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useEffect, useState } from "react";
 import { CategoryList } from "./category-list";
+import { PostCard } from "./post-card";
+import { PostSkeleton } from "./post-skeleton";
 import { PostStats } from "./post-stats";
 
 export default function Posts() {
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const debouncedSearch = useDebounce(searchQuery, 300);
+
+  const { categories } = useCategories();
   const { posts, pagination, isLoading } = usePosts({
     page: currentPage,
     perPage: 12,
+    categories: selectedCategories,
+    search: debouncedSearch,
   });
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, selectedCategories]);
 
   const handlePreviousPage = () => {
     setCurrentPage((prev) => Math.max(prev - 1, 1));
@@ -24,6 +40,16 @@ export default function Posts() {
 
   const handleNextPage = () => {
     setCurrentPage((prev) => Math.min(prev + 1, pagination.totalPages));
+  };
+
+  const handleCategoryChange = (categoryId: string) => {
+    setSelectedCategories((prev) => {
+      if (prev.includes(categoryId)) {
+        return prev.filter((id) => id !== categoryId);
+      } else {
+        return [...prev, categoryId];
+      }
+    });
   };
 
   return (
@@ -42,11 +68,51 @@ export default function Posts() {
       </div>
 
       <TabsContent value="posts" className="space-y-6">
-        {/* Posts Grid */}
         <PostStats />
+
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="w-full sm:w-1/3">
+            <Input
+              id="search"
+              placeholder="Search posts..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <div className="w-full sm:w-2/3">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={
+                  selectedCategories.length === 0 ? "default" : "outline"
+                }
+                size="sm"
+                onClick={() => setSelectedCategories([])}
+                className="rounded-full"
+              >
+                All
+              </Button>
+              {categories.map((category) => (
+                <Button
+                  key={category.id}
+                  variant={
+                    selectedCategories.includes(category.id)
+                      ? "default"
+                      : "outline"
+                  }
+                  size="sm"
+                  onClick={() => handleCategoryChange(category.id)}
+                  className="rounded-full"
+                >
+                  {category.name}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Posts Grid */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {isLoading ? (
-            // Show 12 skeleton cards while loading
             <>
               {Array.from({ length: 12 }).map((_, index) => (
                 <PostSkeleton key={index} />

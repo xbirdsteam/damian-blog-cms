@@ -22,13 +22,12 @@ import { Input } from "@/components/ui/input";
 import { TagInput } from "@/components/ui/tag-input";
 import { Textarea } from "@/components/ui/textarea";
 import { useHomeSettings } from "@/hooks/use-home-settings";
+import type { PlateEditor as PlateEditorType } from "@udecode/plate-common/react";
 import { Loader2, Plus, Trash } from "lucide-react";
-import { useState, useRef } from "react";
+import { useRef, useState } from "react";
 import { UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
 import { FormValues } from "./types";
-import { PlateEditor } from "@/components/editor/plate-editor";
-import type { PlateEditor as PlateEditorType } from "@udecode/plate-common/react";
 
 interface ContactSectionProps {
   form: UseFormReturn<FormValues>;

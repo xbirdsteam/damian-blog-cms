@@ -16,11 +16,38 @@ export interface ContentBlock {
     listItems: ListItem[];
 }
 
-export interface ConsultancyContent {
+export interface WhyWorkWithUsItem {
     id: string;
-    image: string | null;
-    content: ContentBlock[];
-    created_at: string;
+    content: string;
+}
+
+export interface ProcessStep {
+    id: string;
+    title: string;
+    description: string;
+}
+
+export interface HeadParagraph {
+    title: string;
+    content: string;
+}
+
+export interface CallToAction {
+    title: string;
+    description: string;
+}
+
+export interface ConsultancyContent {
+    id?: string;
+    title: string;
+    description: string;
+    headParagraph: HeadParagraph;
+    whyWorkWithUs: WhyWorkWithUsItem[];
+    processSteps: ProcessStep[];
+    image_url: string | null;
+    callToAction: CallToAction;
+    created_at?: string;
+    updated_at?: string;
 }
 
 export interface FormField {
@@ -74,37 +101,130 @@ export const consultancyService = {
         const { data, error } = await supabase
             .from('consultancy')
             .select('*')
-            .limit(1)
-            .maybeSingle();
+            .single();
 
-        if (error) throw error;
+        // If no data exists, create initial record
+        if (error?.code === 'PGRST116') {
+            const initialData = {
+                title: '',
+                description: '',
+                head_paragraph: {
+                    title: '',
+                    content: ''
+                },
+                why_work_with_us: [],
+                process_steps: [],
+                image_url: null,
+                call_to_action: {
+                    title: '',
+                    description: ''
+                }
+            };
 
-        if (!data) {
             const { data: newData, error: createError } = await supabase
                 .from('consultancy')
-                .insert({
-                    image: null,
-                    content: [],
-                })
+                .insert(initialData)
                 .select()
                 .single();
 
             if (createError) throw createError;
-            return newData;
+            return {
+                id: newData.id,
+                title: newData.title,
+                description: newData.description,
+                headParagraph: newData.head_paragraph,
+                whyWorkWithUs: newData.why_work_with_us,
+                processSteps: newData.process_steps,
+                image_url: newData.image_url,
+                callToAction: newData.call_to_action,
+                created_at: newData.created_at,
+                updated_at: newData.updated_at
+            } as ConsultancyContent;
         }
 
-        return data;
+        if (error) throw error;
+
+        const headParagraph = typeof data.head_paragraph === 'string'
+            ? JSON.parse(data.head_paragraph)
+            : data.head_paragraph || { title: '', content: '' };
+
+        return {
+            id: data.id,
+            title: data.title,
+            description: data.description,
+            headParagraph: {
+                title: headParagraph.title || '',
+                content: headParagraph.content || ''
+            },
+            whyWorkWithUs: data.why_work_with_us || [],
+            processSteps: data.process_steps || [],
+            image_url: data.image_url,
+            callToAction: {
+                title: data.call_to_action?.title || '',
+                description: data.call_to_action?.description || ''
+            },
+            created_at: data.created_at,
+            updated_at: data.updated_at,
+        } as ConsultancyContent;
     },
 
-    async updateContent(content: Partial<ConsultancyContent>) {
-        const { data, error } = await supabase
+    async updateContent(content: ConsultancyContent) {
+        // First, check if we have an existing record
+        const { data: existingRecord } = await supabase
             .from('consultancy')
-            .upsert(content)
-            .select()
+            .select('id')
             .single();
 
-        if (error) throw error;
-        return data;
+        if (!existingRecord) {
+            // If no record exists, create one
+            const { error: insertError } = await supabase
+                .from('consultancy')
+                .insert({
+                    title: content.title,
+                    description: content.description,
+                    head_paragraph: {
+                        title: content.headParagraph.title,
+                        content: content.headParagraph.content
+                    },
+                    why_work_with_us: content.whyWorkWithUs,
+                    process_steps: content.processSteps,
+                    image_url: content.image_url,
+                    call_to_action: {
+                        title: content.callToAction.title,
+                        description: content.callToAction.description
+                    },
+                })
+                .select()
+                .single();
+
+            if (insertError) throw insertError;
+        } else {
+            // If record exists, update it
+            const { error: updateError } = await supabase
+                .from('consultancy')
+                .update({
+                    title: content.title,
+                    description: content.description,
+                    head_paragraph: {
+                        title: content.headParagraph.title,
+                        content: content.headParagraph.content
+                    },
+                    why_work_with_us: content.whyWorkWithUs,
+                    process_steps: content.processSteps,
+                    image_url: content.image_url,
+                    call_to_action: {
+                        title: content.callToAction.title,
+                        description: content.callToAction.description
+                    },
+                })
+                .eq('id', existingRecord.id)
+                .select()
+                .single();
+
+            if (updateError) throw updateError;
+        }
+
+        return true;
     },
 
     // Form Steps Management
@@ -343,55 +463,52 @@ export const consultancyService = {
     },
 
     async uploadImage(file: File) {
-        const CONSULTANCY_IMAGE_PATH = 'consultancy/featured-image';
-        const fileExt = file.name.substring(file.name.lastIndexOf('.'));
-        const fileName = `${CONSULTANCY_IMAGE_PATH}-${Date.now()}${fileExt}`;
+        const supabase = createClient();
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${crypto.randomUUID()}.${fileExt}`;
+        const filePath = `consultancy/${fileName}`;
 
-        try {
-            const { data: uploadData, error: uploadError } = await supabase
-                .storage
-                .from('images')
-                .upload(fileName, file, {
-                    cacheControl: '3600',
-                    upsert: true
-                });
+        // Get current record
+        const { data: currentData } = await supabase
+            .from('consultancy')
+            .select('id, image_url')
+            .single();
 
-            if (uploadError) throw uploadError;
+        if (!currentData) throw new Error('No consultancy record found');
 
-            const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/images/${fileName}`;
-
-            const { data: existingContent, error: fetchError } = await supabase
-                .from('consultancy')
-                .select('id')
-                .limit(1)
-                .single();
-
-            if (fetchError) throw fetchError;
-
-            const { data: contentData, error: updateError } = await supabase
-                .from('consultancy')
-                .upsert({
-                    id: existingContent.id,
-                    image: publicUrl,
-                })
-                .select()
-                .single();
-
-            if (updateError) throw updateError;
-
-            return {
-                url: publicUrl,
-                content: contentData
-            };
-        } catch (error) {
-            if (fileName) {
+        // Delete old image if exists
+        if (currentData.image_url) {
+            const oldFilePath = currentData.image_url.split('/').pop();
+            if (oldFilePath) {
                 await supabase
                     .storage
                     .from('images')
-                    .remove([fileName]);
+                    .remove([`consultancy/${oldFilePath}`]);
             }
-            throw error;
         }
+
+        // Upload new image
+        const { error: uploadError } = await supabase
+            .storage
+            .from('images')
+            .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data } = supabase
+            .storage
+            .from('images')
+            .getPublicUrl(filePath);
+
+        // Update the record with new image URL
+        const { error: updateError } = await supabase
+            .from('consultancy')
+            .update({ image_url: data.publicUrl })
+            .eq('id', currentData.id);
+
+        if (updateError) throw updateError;
+
+        return data.publicUrl;
     },
 
     async deleteImage() {
@@ -435,16 +552,16 @@ export const consultancyService = {
         const defaultSteps = [
             {
                 step_number: 1,
-                title: "Personal Information",
-                description: "Please provide your basic information",
+                title: "",
+                description: "",
                 fields: {
                     inputs: []
                 }
             },
             {
                 step_number: 2,
-                title: "Additional Information",
-                description: "Tell us more about your needs",
+                title: "",
+                description: "",
                 fields: {
                     radio_group1: { label: "", options: [] },
                     radio_group2: { label: "", options: [] },
@@ -453,8 +570,8 @@ export const consultancyService = {
             },
             {
                 step_number: 3,
-                title: "Preferences",
-                description: "Select your preferences",
+                title: "",
+                description: "",
                 fields: {
                     checkbox: { label: "", options: [] },
                     textarea: { label: "" }
@@ -462,8 +579,8 @@ export const consultancyService = {
             },
             {
                 step_number: 4,
-                title: "Options",
-                description: "Choose your options",
+                title: "",
+                description: "",
                 fields: {
                     radio_group1: { label: "", options: [] },
                     radio_group2: { label: "", options: [] }
@@ -471,8 +588,8 @@ export const consultancyService = {
             },
             {
                 step_number: 5,
-                title: "Further Details",
-                description: "Provide additional details",
+                title: "",
+                description: "",
                 fields: {
                     radio_group1: { label: "", options: [] },
                     radio_group2: { label: "", options: [] },
@@ -482,8 +599,8 @@ export const consultancyService = {
             },
             {
                 step_number: 6,
-                title: "Final Comments",
-                description: "Any final thoughts",
+                title: "",
+                description: "",
                 fields: {
                     textarea: ""
                 }

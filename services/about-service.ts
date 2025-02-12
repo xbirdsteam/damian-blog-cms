@@ -7,10 +7,41 @@ export async function getAboutData() {
     const supabase = createClient();
     const { data, error } = await supabase
         .from('about_me')
-        .select('*')
+        .select(`
+            id,
+            title,
+            mission,
+            vision,
+            image_url,
+            timelines,
+            where_i_am,
+            links
+        `)
         .single();
 
-    if (error) return null;
+    if (error) {
+        // If no row exists, create initial row
+        const initialData = {
+            id: uuidv4(),
+            title: '',
+            mission: '',
+            vision: '',
+            image_url: '',
+            timelines: [],
+            where_i_am: '',
+            links: []
+        };
+
+        const { data: newData, error: createError } = await supabase
+            .from('about_me')
+            .insert(initialData)
+            .select()
+            .single();
+
+        if (createError) throw createError;
+        return newData as AboutData;
+    }
+
     return data as AboutData;
 }
 

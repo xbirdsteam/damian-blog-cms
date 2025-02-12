@@ -1,45 +1,46 @@
-import { getSettings, uploadLogo, updateFooter, FooterSettings } from "@/services/settings-service";
+import { settingsService, Settings, UpdateLayoutOptions } from "@/services/settings-service";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 export function useSettings() {
     const queryClient = useQueryClient();
 
-    const query = useQuery({
-        queryKey: ["settings"],
-        queryFn: getSettings,
+    const { data, isLoading } = useQuery({
+        queryKey: ['settings'],
+        queryFn: settingsService.getSettings,
     });
 
-    const uploadLogoMutation = useMutation({
-        mutationFn: uploadLogo,
+    const { mutateAsync: updateLayout, isPending: isSavingLayout } = useMutation({
+        mutationFn: (options: UpdateLayoutOptions) => settingsService.updateLayout(options),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["settings"] });
-            toast.success("Logo updated successfully");
+            queryClient.invalidateQueries({ queryKey: ['settings'] });
+            toast.success("Settings updated successfully");
         },
         onError: (error) => {
-            console.error("Error updating logo:", error);
-            toast.error("Failed to update logo");
+            console.error("Error updating settings:", error);
+            toast.error("Failed to update settings");
         },
     });
 
-    const updateFooterMutation = useMutation({
-        mutationFn: ({ id, settings }: { id: string, settings: FooterSettings }) => updateFooter(id, settings),
+    const { mutateAsync: uploadLogo, isPending: isUploading } = useMutation({
+        mutationFn: ({ file, type }: { file: File; type: "header" | "footer" }) =>
+            settingsService.uploadLogo(file, type),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ["settings"] });
-            toast.success("Footer settings updated successfully");
+            queryClient.invalidateQueries({ queryKey: ['settings'] });
+            toast.success("Logo uploaded successfully");
         },
         onError: (error) => {
-            console.error("Error updating footer:", error);
-            toast.error("Failed to update footer settings");
+            console.error("Error uploading logo:", error);
+            toast.error("Failed to upload logo");
         },
     });
 
     return {
-        data: query.data,
-        isLoading: query.isLoading,
-        uploadLogo: uploadLogoMutation.mutateAsync,
-        isUploading: uploadLogoMutation.isPending,
-        updateFooter: updateFooterMutation.mutateAsync,
-        isSavingFooter: updateFooterMutation.isPending,
+        data,
+        isLoading,
+        updateLayout,
+        isSavingLayout,
+        uploadLogo,
+        isUploading,
     };
-} 
+}

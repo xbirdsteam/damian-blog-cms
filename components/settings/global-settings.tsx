@@ -1,10 +1,8 @@
 "use client";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSettings } from "@/hooks/use-settings";
-import { FooterSettings } from "./footer-settings";
-import { HeaderSettings } from "./header-settings";
+import { LayoutSettings } from "./layout-settings";
 
 export function GlobalSettings() {
   const { isLoading, data } = useSettings();
@@ -28,36 +26,7 @@ export function GlobalSettings() {
           Customize your website&apos;s header and footer appearance
         </p>
       </div>
-      <Tabs defaultValue="header" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 lg:w-[400px] p-1">
-          <TabsTrigger value="header">Header</TabsTrigger>
-          <TabsTrigger value="footer">Footer</TabsTrigger>
-        </TabsList>
-        <div className="border rounded-lg p-1">
-          <TabsContent value="header" className="space-y-4 p-4">
-            <div className="flex items-center gap-2 pb-4 border-b">
-              <div>
-                <h3 className="font-medium">Header Configuration</h3>
-                <p className="text-sm text-muted-foreground">
-                  Manage your website&apos;s header, logo, and navigation menu
-                </p>
-              </div>
-            </div>
-            <HeaderSettings />
-          </TabsContent>
-          <TabsContent value="footer" className="space-y-4 p-4">
-            <div className="flex items-center gap-2 pb-4 border-b">
-              <div>
-                <h3 className="font-medium">Footer Configuration</h3>
-                <p className="text-sm text-muted-foreground">
-                  Customize your website&apos;s footer content and social links
-                </p>
-              </div>
-            </div>
-            <FooterSettings id={data?.id || ""} />
-          </TabsContent>
-        </div>
-      </Tabs>
+      <LayoutSettings id={data?.id || ""} />
     </div>
   );
 }

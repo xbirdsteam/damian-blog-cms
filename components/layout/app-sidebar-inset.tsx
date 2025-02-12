@@ -28,12 +28,6 @@ export default function AppSidebarInset() {
       <header className="flex h-16 items-center gap-4 border-b bg-background px-6">
         <SidebarTrigger className="-ml-2" />
         <h2 className="text-lg font-semibold">{getPageTitle()}</h2>
-        <div className="ml-auto">
-          <Button className="gap-2">
-            <MoveUpRight className="h-4 w-4" />
-            Preview
-          </Button>
-        </div>
       </header>
     </SidebarInset>
   );

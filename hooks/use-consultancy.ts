@@ -14,19 +14,14 @@ export function useConsultancyContent() {
     const queryClient = useQueryClient();
 
     const { data: content, isLoading } = useQuery({
-        queryKey: ["consultancy-content"],
-        queryFn: () => consultancyService.getContent(),
-        staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+        queryKey: ['consultancy-content'],
+        queryFn: consultancyService.getContent,
     });
 
     const { mutateAsync: saveContent, isPending: isSaving } = useMutation({
-        mutationFn: (data: ConsultancyData) => consultancyService.saveContent(data),
-        onSuccess: (newData) => {
-            queryClient.setQueryData(["consultancy-content"], newData);
-            toast.success("Content saved successfully");
-        },
-        onError: () => {
-            toast.error("Failed to save content");
+        mutationFn: consultancyService.updateContent,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['consultancy-content'] });
         },
     });
 

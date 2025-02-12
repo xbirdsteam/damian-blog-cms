@@ -1,13 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { createClient } from "@/utils/supabase/client";
+import { Section } from "@/types/editor";
 
 export interface Post {
     id?: string;
     title: string;
     slug: string;
     short_description: string | null;
-    content: string | null;
+    content: string | null;  // Content is always a string in Supabase
     posts_categories: {
         categories: {
             id: string;
@@ -21,20 +22,15 @@ export interface Post {
     updated_at: string;
 }
 
-interface GetPostsOptions {
-    category?: string;
-    page?: number;
-    perPage?: number;
-}
-
 export interface CreatePostOptions {
-    categoryIds: string[];
-    status: "draft" | "published";
     title: string;
     slug: string;
-    short_description: string | null;
-    post_img: string | null;
-    content: any;
+    short_description: string;
+    post_img: string;
+    status: "draft" | "published";
+    categoryIds: string[];
+    content: Section[]; // This will store all sections
+    publish_date: Date | null;
 }
 
 export interface PostStats {
@@ -94,198 +90,191 @@ export const postService = {
         }
     },
 
-    async updatePost(id: string, updates: Partial<CreatePostOptions>) {
+    async updatePost(id: string, options: Partial<CreatePostOptions>) {
         const supabase = createClient();
-        const { categoryIds, ...postData } = updates;
+        const updates: any = {
+            updated_at: new Date().toISOString(),
+        };
 
-        // Start a transaction
-        const { error: postError } = await supabase
+        // Only include fields that are provided
+        if (options.title) updates.title = options.title;
+        if (options.slug) updates.slug = options.slug;
+        if (options.short_description) updates.short_description = options.short_description;
+        if (options.post_img) updates.post_img = options.post_img;
+        if (options.status) updates.status = options.status;
+        if (options.content) updates.content = JSON.stringify(options.content);
+
+        // Get the post's created_at timestamp
+        const { data: currentPost } = await supabase
             .from("posts")
-            .update(
-                {
-                    ...postData,
-                    content: postData.content ? JSON.stringify(postData.content) : "",
-                    id
-                },
-            ).eq("id", id)
+            .select("created_at")
+            .eq("id", id)
+            .single();
 
-        if (postError) throw postError;
+        if (!currentPost) throw new Error("Post not found");
 
-        // Update categories using categoryIds
-        if (categoryIds && categoryIds.length > 0) {
-            const categoryLinks = categoryIds.map(categoryId => ({
-                post_id: id,
-                category_id: categoryId
-            }));
-
-            // Delete existing category links
-            await supabase
-                .from('posts_categories')
-                .delete()
-                .eq('post_id', id);
-
-            // Insert new category links
-            const { error: categoryError } = await supabase
-                .from('posts_categories')
-                .insert(categoryLinks);
-
-            if (categoryError) throw categoryError;
-        }
-
-        // Transform the response to match our interface
-        return { id }
-    },
-
-    async createPost(post: CreatePostOptions) {
-        const supabase = createClient();
-        const { categoryIds, ...postData } = post;
-        // Generate unique slug if title is provided and no slug exists
-        const slug = postData.title && !postData.slug ? await this.generateSlug(postData.title) : postData.slug;
-        // Start a transaction
-        const { data: newPost, error: postError } = await supabase
+        const { data, error } = await supabase
             .from("posts")
-            .insert(
-                {
-                    ...postData,
-                    slug,
-                    content: postData.content ? JSON.stringify(postData.content) : null,
-                }
-            )
+            .update(updates)
+            .eq("id", id)
             .select()
             .single();
 
-        if (postError) throw postError;
+        if (error) throw error;
 
-        // Update categories using categoryIds
-        if (categoryIds && categoryIds.length > 0) {
-            const categoryLinks = categoryIds.map(categoryId => ({
-                post_id: newPost.id,
-                category_id: categoryId
+        // Update categories if provided
+        if (options.categoryIds) {
+            await supabase
+                .from("posts_categories")
+                .delete()
+                .eq("post_id", id);
+
+            const categoryRelations = options.categoryIds.map(categoryId => ({
+                post_id: id,
+                category_id: categoryId,
             }));
 
-            // Delete existing category links
-            await supabase
-                .from('posts_categories')
-                .delete()
-                .eq('post_id', newPost.id);
+            const { error: relationError } = await supabase
+                .from("posts_categories")
+                .insert(categoryRelations);
 
-            // Insert new category links
-            const { error: categoryError } = await supabase
-                .from('posts_categories')
-                .insert(categoryLinks);
-
-            if (categoryError) throw categoryError;
+            if (relationError) throw relationError;
         }
 
+        return data;
+    },
 
-        // Transform the response to match our interface
+    async createPost(options: CreatePostOptions) {
+        const supabase = createClient();
+        const now = new Date().toISOString();
+
+        // Create the post first to get its ID
+        const { data, error } = await supabase.from("posts").insert({
+            title: options.title,
+            slug: options.slug,
+            short_description: options.short_description,
+            post_img: options.post_img,
+            status: options.status,
+            content: JSON.stringify(options.content),
+            created_at: now,
+            updated_at: now,
+        }).select().single();
+
+        if (error) throw error;
+
+        // Handle category relationships
+        if (options.categoryIds.length > 0) {
+            const categoryRelations = options.categoryIds.map(categoryId => ({
+                post_id: data.id,
+                category_id: categoryId,
+            }));
+
+            const { error: relationError } = await supabase
+                .from("posts_categories")
+                .insert(categoryRelations);
+
+            if (relationError) throw relationError;
+        }
+
+        return data;
+    },
+
+    async getPosts(options?: {
+        categories?: string[];
+        page?: number;
+        perPage?: number;
+        search?: string;
+    }) {
+        const supabase = createClient();
+        const page = options?.page || 1;
+        const perPage = options?.perPage || 10;
+        const start = (page - 1) * perPage;
+        const end = start + perPage - 1;
+
+        // First, get post IDs that match the category filter
+        let postIds: string[] = [];
+        if (options?.categories && options.categories.length > 0) {
+            const { data: filteredPosts } = await supabase
+                .from('posts_categories')
+                .select(`
+                    post_id
+                `)
+                .in('category_id', options.categories);
+
+            postIds = Array.from(new Set(filteredPosts?.map(p => p.post_id) || []));
+        }
+
+        // Now get the full post data
+        let query = supabase
+            .from('posts')
+            .select(`
+                *,
+                posts_categories (
+                    category_id,
+                    categories (
+                        id,
+                        name
+                    )
+                )
+            `, { count: 'exact' });
+
+        // Add search filter if provided
+        if (options?.search) {
+            query = query.or(`title.ilike.%${options.search}%,short_description.ilike.%${options.search}%`);
+        }
+
+        // Add category filter using post IDs if categories were selected
+        if (options?.categories && options.categories.length > 0) {
+            if (postIds.length === 0) {
+                return {
+                    posts: [],
+                    currentPage: page,
+                    perPage,
+                    total: 0,
+                    totalPages: 0,
+                };
+            }
+            query = query.in('id', postIds);
+        }
+
+        // Add pagination and ordering
+        const { data: posts, error, count } = await query
+            .order('created_at', { ascending: false })
+            .range(start, end);
+
+        if (error) throw error;
+
         return {
-            ...newPost,
-            content: newPost.content ? JSON.parse(newPost.content) : null,
-            seo: {
-                title: newPost.seo_title || null,
-                description: newPost.seo_description || null,
-                keywords: newPost.seo_keywords || null,
-            },
+            posts: (posts || []) as Post[],
+            currentPage: page,
+            perPage,
+            total: count || 0,
+            totalPages: count ? Math.ceil(count / perPage) : 0,
         };
     },
-    async getPosts(options: GetPostsOptions = {}): Promise<PaginatedPosts> {
-        const supabase = createClient();
-        const page = options.page || 1;
-        const perPage = options.perPage || 2;
-        const from = (page - 1) * perPage;
-        const to = from + perPage - 1;
 
-        try {
-            // First get total count
-            const countQuery = supabase
-                .from("posts")
-                .select('id', { count: 'exact' });
-
-            if (options.category) {
-                countQuery.eq('posts_categories.category_id', options.category);
-            }
-
-            const { count, error: countError } = await countQuery;
-            if (countError) throw countError;
-
-            // Then get paginated data
-            let query = supabase
-                .from("posts")
-                .select(`
-                    *,
-                    posts_categories!inner (
-                        categories (
-                            id,
-                            name
-                        )
-                    )
-                `)
-                .order('created_at', { ascending: false })
-                .range(from, to);
-
-            // Add category filter if specified
-            if (options.category) {
-                query = query.eq('posts_categories.category_id', options.category);
-            }
-
-            const { data, error } = await query;
-            if (error) throw error;
-
-            const totalPages = Math.ceil((count || 0) / perPage);
-
-            // Transform the data to match our Post interface
-            const posts = (data || []).map(post => ({
-                ...post,
-                content: post.content ? JSON.parse(post.content) : null,
-                seo: {
-                    title: post.seo_title || null,
-                    description: post.seo_description || null,
-                    keywords: post.seo_keywords || null,
-                }
-            })) as Post[];
-
-            return {
-                posts,
-                total: count || 0,
-                page,
-                perPage,
-                totalPages,
-            };
-        } catch (error) {
-            console.error("Error fetching posts:", error);
-            throw error;
-        }
-    },
     async getPost(id: string) {
         const supabase = createClient();
-        const { data: post, error } = await supabase
+        const { data, error } = await supabase
             .from("posts")
             .select(`
                 *,
-                    posts_categories!inner (
-                        categories (
-                            id,
-                            name
-                        )
+                posts_categories (
+                    categories (
+                        id,
+                        name
                     )
+                )
             `)
             .eq("id", id)
             .single();
 
         if (error) throw error;
-        if (!post) return null;
 
-        return {
-            ...post,
-            content: post.content ? JSON.parse(post.content) : null,
-            seo: {
-                title: post.seo_title || null,
-                description: post.seo_description || null,
-                keywords: post.seo_keywords || null,
-            }
-        };
+        // No need to parse content here, return it as is
+        return data;
     },
+
     async deletePost(id: string) {
         const supabase = createClient();
 
@@ -304,6 +293,7 @@ export const postService = {
             throw error;
         }
     },
+
     async getPostStats(): Promise<PostStats> {
         const supabase = createClient();
 
@@ -375,5 +365,5 @@ export const postService = {
             .sort((a, b) => b.count - a.count); // Sort by count in descending order
 
         return stats;
-    }
+    },
 };

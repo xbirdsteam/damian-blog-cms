@@ -1,27 +1,26 @@
 import { createClient } from "@/utils/supabase/client";
 
 export const uploadService = {
-    async uploadImage(file: File, path: string) {
+    async uploadImage(file: File): Promise<string> {
         const supabase = createClient();
 
         const fileExt = file.name.split('.').pop();
-        const fileName = `${crypto.randomUUID()}.${fileExt}`;
-        const fullPath = `${path}/${fileName}`;
+        const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `post-images/${fileName}`;
 
-        const { error: uploadError } = await supabase
+        const { data, error } = await supabase
             .storage
             .from('images')
-            .upload(fullPath, file, {
-                cacheControl: '3600',
-                upsert: false
-            });
+            .upload(filePath, file);
 
-        if (uploadError) throw uploadError;
+        if (error) {
+            throw error;
+        }
 
         const { data: { publicUrl } } = supabase
             .storage
             .from('images')
-            .getPublicUrl(fullPath);
+            .getPublicUrl(filePath);
 
         return publicUrl;
     }

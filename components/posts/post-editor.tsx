@@ -1,18 +1,19 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-} from "@/components/plate-ui/command";
-import { Badge } from "@/components/ui/badge";
+import { SeoSettingsModal } from "@/components/common/seo-settings-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -21,43 +22,57 @@ import {
 import { Input } from "@/components/ui/input";
 import { LoadingImage } from "@/components/ui/loading-image";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useCategories } from "@/hooks/use-categories";
 import { usePosts } from "@/hooks/use-posts";
-import { cn } from "@/lib/utils";
-import { CreatePostOptions, Post, postService } from "@/services/post-service";
+import { useSEO } from "@/hooks/use-seo";
+import { slugify } from "@/lib/utils";
+import { Post } from "@/services/post-service";
 import { uploadService } from "@/services/upload-service";
+import { Section, SectionType } from "@/types/editor";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { slateToHtml, slateToHtmlConfig } from "@slate-serializers/html";
-import { PlateEditor } from "@udecode/plate-common/react";
 import {
   ArrowLeft,
-  Check,
-  ChevronsUpDown,
   ImageIcon,
+  Loader2,
+  Plus,
   Save,
   Send,
   X,
 } from "lucide-react";
+import { nanoid } from "nanoid";
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import * as z from "zod";
-import { PlateEditor as PlateEditorComponent } from "../editor/plate-editor";
-import { SettingsProvider } from "../editor/settings";
-import { LoadingSpinner } from "../ui/loading-spinner";
+import { seoSchema } from "../home/types";
+import {
+  BlockquoteSection,
+  ImageSection,
+  TableSection,
+  TestimonialSection,
+  TextSection,
+} from "./sections";
+import { ListSection } from "./sections/list-section";
+import { PostAuthorSection } from "./sections/post-author-section";
+import { SortableSections } from "./sections/sortable-sections";
 
 const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
+  slug: z.string().min(1, "Slug is required"),
   shortDescription: z.string().min(1, "Short description is required"),
-  content: z.any().optional(),
-  categoryIds: z.array(z.string()).min(1, "At least one category is required"),
+  selectedCategories: z
+    .array(z.string())
+    .min(1, "At least one category is required"),
   postImg: z.string().nullable().optional(),
+  sections: z.array(z.any()).optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -65,103 +80,128 @@ type FormValues = z.infer<typeof formSchema>;
 interface PostEditorProps {
   initialData?: Post | null;
   mode: "create" | "edit";
+  post_created_at?: string;
 }
 
-export function PostEditor({ initialData, mode }: PostEditorProps) {
+// Update PostStatus type to match CreatePostOptions
+type PostStatus = "draft" | "published";
+
+export function PostEditor({
+  initialData,
+  mode,
+  post_created_at,
+}: PostEditorProps) {
   const { categories } = useCategories();
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const editorRef = useRef<PlateEditor | null>(null);
   const { createPost, updatePost, isCreating, isUpdating } = usePosts();
   const [isPublishing, setIsPublishing] = useState(false);
-  const isSaving = (isCreating || isUpdating) && !isPublishing;
 
-  // Transform posts_categories into categoryIds array
-  const initialCategoryIds =
-    initialData?.posts_categories?.map((pc) => pc.categories.id) || [];
+  // Initialize sections from initialData if available
+  const [sections, setSections] = useState<Section[]>(() => {
+    if (initialData?.content) {
+      try {
+        // Handle content from Supabase which is always a string
+        const parsedContent = JSON.parse(initialData.content as string);
+        if (Array.isArray(parsedContent)) {
+          return parsedContent;
+        }
+      } catch (error) {
+        console.error("Error parsing content:", error);
+      }
+    }
+    return [];
+  });
 
+  const [selectedCategories, setSelectedCategories] = useState<
+    Array<{
+      id: string;
+      name: string;
+    }>
+  >(
+    initialData?.posts_categories?.map((pc) => ({
+      id: pc.categories.id,
+      name: pc.categories.name,
+    })) || []
+  );
+
+  // Initialize form with initial data
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       title: initialData?.title || "",
+      slug: initialData?.slug || "",
       shortDescription: initialData?.short_description || "",
-      content: initialData?.content || "",
-      categoryIds: initialCategoryIds,
-      postImg: initialData?.post_img || null,
+      selectedCategories:
+        initialData?.posts_categories?.map((pc) => pc.categories.id) || [],
+      postImg: initialData?.post_img || "",
     },
   });
 
-  // const handleSeoSubmit = async (values: {
-  //   title: string;
-  //   description: string;
-  //   keywords: string;
-  // }) => {
-  //   form.setValue("seo", values);
-  //   setIsSavingSeo(true);
-  //   // Update SEO in the database if editing an existing post
-  //   if (initialData?.id) {
-  //     await updatePost({ id: initialData.id });
-  //     toast.success("SEO updated successfully");
-  //     setIsSavingSeo(false);
-  //   }
-  // };
+  // Update form and sections when initialData changes
+  useEffect(() => {
+    if (initialData) {
+      // Update form values
+      form.reset({
+        title: initialData.title,
+        slug: initialData.slug,
+        shortDescription: initialData.short_description || "",
+        selectedCategories:
+          initialData?.posts_categories?.map((pc) => pc.categories.id) || [],
+        postImg: initialData.post_img || "",
+      });
 
-  const handleFeaturedImageUpload = async (file: File) => {
-    try {
-      setIsUploadingImage(true);
-      // Upload image to storage
-      const url = await uploadService.uploadImage(file, "posts/featured");
-
-      // Update form state
-      form.setValue("postImg", url);
-
-      // If we're editing an existing post, update it in the database
-      if (initialData?.id) {
-        await postService.updatePost(initialData.id, {
-          post_img: url,
-        });
+      // Update sections
+      if (initialData.content) {
+        try {
+          const parsedContent = JSON.parse(initialData.content as string);
+          if (Array.isArray(parsedContent)) {
+            setSections(parsedContent);
+          }
+        } catch (error) {
+          console.error("Error parsing content:", error);
+        }
       }
-
-      toast.success("Image uploaded successfully");
-    } catch (error) {
-      console.error("Error uploading image:", error);
-      toast.error("Failed to upload image");
-    } finally {
-      setIsUploadingImage(false);
     }
-  };
+  }, [initialData, form]);
 
-  const handleSeoImageUpload = async (file: File) => {
+  const isSaving = isCreating || isUpdating;
+
+  // Watch title changes and update slug
+  useEffect(() => {
+    const subscription = form.watch((value, { name }) => {
+      // Update slug when title changes
+      if (name === "title") {
+        const newSlug = slugify(value.title || "");
+        form.setValue("slug", newSlug, { shouldDirty: true });
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [form]);
+
+  const onSubmit = async (values: FormValues, isDraft: boolean = true) => {
     try {
-      const url = await uploadService.uploadImage(file, "posts/seo");
-      return url;
-    } catch (error) {
-      console.error("Error uploading SEO image:", error);
-      toast.error("Failed to upload SEO image");
-      throw error;
-    }
-  };
+      setIsPublishing(!isDraft);
 
-  const onSubmit = async (values: FormValues, isDraft: boolean) => {
-    try {
-      const editorContent = editorRef.current?.children || [];
+      // Explicitly type the status
+      const status: PostStatus = isDraft ? "draft" : "published";
 
-      const postData: CreatePostOptions = {
-        categoryIds: values.categoryIds,
-        status: isDraft ? "draft" : "published",
-        content: editorContent,
-        post_img: values.postImg || "",
-        short_description: values.shortDescription,
-
+      const postData = {
         title: values.title,
-        slug: "",
+        slug: values.slug,
+        short_description: values.shortDescription,
+        post_img: values.postImg || "",
+        status, // Use the typed status
+        categoryIds: values.selectedCategories,
+        content: sections,
+        publish_date: isDraft ? null : new Date(),
       };
 
-      if (!isDraft) {
-        setIsPublishing(true);
-      }
-
       if (mode === "edit" && initialData?.id) {
-        await updatePost({ id: initialData.id, ...postData });
+        await updatePost({
+          id: initialData.id,
+          ...postData,
+        } as const); // Use const assertion to preserve literal types
         toast.success(
           isDraft ? "Post updated successfully" : "Post published successfully"
         );
@@ -179,285 +219,671 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
     }
   };
 
-  return (
-    <Form {...form}>
-      <div className="mx-auto p-6 space-y-8">
-        <div className="flex flex-col gap-4">
-          <Link
-            href="/cms/posts"
-            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Posts
-          </Link>
-          <h1 className="text-2xl font-semibold">
-            {mode === "create" ? "Create Post" : "Edit Post"}
-          </h1>
-        </div>
+  const handleImageUpload = async (file: File) => {
+    try {
+      setIsUploadingImage(true);
 
-        <div className="flex justify-between items-center">
-          {/* <SeoSettingsModal
+      // Upload image and get URL
+      const url = await uploadService.uploadImage(file);
+
+      // Update form with the new image URL
+      form.setValue("postImg", url, { shouldDirty: true });
+
+      toast.success("Image uploaded successfully");
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      toast.error("Failed to upload image");
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  const handleAddSection = (type: SectionType) => {
+    let newSection: Section;
+
+    switch (type) {
+      case "text":
+        newSection = {
+          id: nanoid(),
+          type: "text",
+          title: "",
+          paragraphs: [""],
+        };
+        break;
+
+      case "table":
+        newSection = {
+          id: nanoid(),
+          type: "table",
+          title: "",
+          columns: [
+            { header: "Ingredients", key: "column1" },
+            { header: "Instructions", key: "column2" },
+          ],
+          rows: [
+            {
+              column1: {
+                type: "list",
+                lists: [],
+              },
+              column2: {
+                type: "list",
+                lists: [],
+              },
+            },
+          ],
+        };
+        break;
+
+      case "blockquote":
+        newSection = {
+          id: nanoid(),
+          type: "blockquote",
+          content: "",
+          author: "",
+        };
+        break;
+
+      case "testimonial":
+        newSection = {
+          id: nanoid(),
+          type: "testimonial",
+          content: "",
+          author: "",
+        };
+        break;
+
+      case "image":
+        newSection = {
+          id: nanoid(),
+          type: "image",
+          urls: [],
+        };
+        break;
+
+      case "list":
+        newSection = {
+          id: nanoid(),
+          type: "list",
+          title: "",
+          lists: [{ title: "", items: [""] }],
+        };
+        break;
+
+      case "post-author":
+        newSection = {
+          id: nanoid(),
+          type: "post-author",
+          author_name: "",
+          avatar_url: null,
+        };
+        break;
+
+      default:
+        throw new Error(`Unsupported section type: ${type}`);
+    }
+
+    setSections((prev) => [...prev, newSection]);
+  };
+
+  const handleUpdateSection = (id: string, updates: Partial<Section>) => {
+    setSections((prev) =>
+      prev.map((section) => {
+        if (section.id !== id) return section;
+
+        const updatedSection = { ...section, ...updates };
+
+        // Ensure all required properties are present based on type
+        switch (updatedSection.type) {
+          case "text":
+            return {
+              id: updatedSection.id,
+              type: "text",
+              title: updatedSection.title || "",
+              paragraphs: updatedSection.paragraphs || [""],
+            };
+
+          case "table":
+            return {
+              id: updatedSection.id,
+              type: "table",
+              title: updatedSection.title || "",
+              columns: updatedSection.columns || [
+                { header: "Ingredients", key: "column1" },
+                { header: "Instructions", key: "column2" },
+              ],
+              rows: updatedSection.rows || [
+                {
+                  column1: {
+                    type: "list",
+                    lists: [],
+                  },
+                  column2: {
+                    type: "list",
+                    lists: [],
+                  },
+                },
+              ],
+            };
+
+          case "blockquote":
+            return {
+              id: updatedSection.id,
+              type: "blockquote",
+              content: updatedSection.content || "",
+              author: updatedSection.author || "",
+            };
+
+          case "testimonial":
+            return {
+              id: updatedSection.id,
+              type: "testimonial",
+              content: updatedSection.content || "",
+              author: updatedSection.author || "",
+            };
+
+          case "image":
+            return {
+              id: updatedSection.id,
+              type: "image",
+              urls: updatedSection.urls || [],
+            };
+
+          case "list":
+            return {
+              id: updatedSection.id,
+              type: "list",
+              title: updatedSection.title || "",
+              lists: updatedSection.lists || [{ title: "", items: [""] }],
+            };
+
+          case "post-author":
+            return {
+              id: updatedSection.id,
+              type: "post-author",
+              author_name: updatedSection.author_name || "",
+              avatar_url: updatedSection.avatar_url || null,
+            };
+
+          default:
+            return section;
+        }
+      })
+    );
+  };
+
+  const handleDeleteSection = (id: string) => {
+    setSections((prev) => prev.filter((section) => section.id !== id));
+  };
+
+  // Define section types array
+  const sectionTypes = [
+    { type: "text", label: "Text" },
+    { type: "table", label: "Table" },
+    { type: "blockquote", label: "Blockquote" },
+    { type: "testimonial", label: "Testimonial" },
+    { type: "image", label: "Image" },
+    { type: "list", label: "List" },
+    { type: "post-author", label: "Post Author" },
+  ] as const;
+
+  // Add category handler
+  const handleCategorySelect = (categoryId: string) => {
+    const category = categories.find((c) => c.id === categoryId);
+    if (!category) return;
+
+    // Check if category is already selected
+    if (!selectedCategories.some((sc) => sc.id === categoryId)) {
+      const newCategories = [
+        ...selectedCategories,
+        { id: categoryId, name: category.name },
+      ];
+      setSelectedCategories(newCategories);
+      form.setValue(
+        "selectedCategories",
+        newCategories.map((c) => c.id),
+        { shouldDirty: true }
+      );
+    }
+  };
+
+  // Remove category handler
+  const handleRemoveCategory = (categoryId: string) => {
+    const newCategories = selectedCategories.filter((c) => c.id !== categoryId);
+    setSelectedCategories(newCategories);
+    form.setValue(
+      "selectedCategories",
+      newCategories.map((c) => c.id),
+      { shouldDirty: true }
+    );
+  };
+
+  // Update SEO hook to use dynamic slug
+  const seoRefId = initialData?.id || "";
+  const postSlug = form.watch("slug"); // Watch for slug changes
+  const {
+    seoConfig,
+    updateSEO,
+    isUpdating: isUpdatingSEO,
+  } = useSEO(seoRefId, `gastronomy/${postSlug}`);
+
+  // Update SEO submit handler to use the current slug
+  const handleSeoSubmit = async (values: z.infer<typeof seoSchema>) => {
+    try {
+      const currentSlug = form.getValues("slug");
+      if (!currentSlug) {
+        toast.error("Please set a post title first to generate the slug");
+        return;
+      }
+
+      const payload: any = {
+        seo_ref_id: seoRefId,
+        meta_title: values.title,
+        meta_description: values.description,
+        meta_keywords: values.keywords,
+        og_image: values.og_image || null,
+        slug: `gastronomy/${currentSlug}`, // Use the full path
+      };
+
+      if (seoConfig?.id) {
+        payload.id = seoConfig.id;
+      }
+
+      await updateSEO(payload);
+    } catch (error) {
+      console.error("Error updating SEO settings:", error);
+      toast.error("Failed to update SEO settings");
+    }
+  };
+
+  // Update SEO image upload handler to use the slug in the path
+  const handleSeoImageUpload = async (file: File) => {
+    try {
+      const currentSlug = form.getValues("slug");
+      if (!currentSlug) {
+        throw new Error("Post slug not available");
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("path", `gastronomy/${currentSlug}/seo/og-image`);
+
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error("Failed to upload image");
+
+      const { url } = await response.json();
+      return url;
+    } catch (error) {
+      console.error("Error uploading SEO image:", error);
+      throw error;
+    }
+  };
+
+  return (
+    <div>
+      {/* Header */}
+      {mode === "edit" && (
+        <div className="flex w-full justify-end px-6 pt-10">
+          <SeoSettingsModal
             defaultValues={{
-              title: form.getValues("seo.title") || "",
-              description: form.getValues("seo.description") || "",
-              keywords: form.getValues("seo.keywords") || "",
-              og_image: form.getValues("seo.og_image") || "",
+              title: seoConfig?.meta_title || "",
+              description: seoConfig?.meta_description || "",
+              keywords: seoConfig?.meta_keywords || "",
+              og_image: seoConfig?.og_image || "",
             }}
             onSubmit={handleSeoSubmit}
             onImageUpload={handleSeoImageUpload}
+            isSaving={isUpdatingSEO}
             pageName="Post"
-            isSaving={isSavingSeo}
-            showOgImage={false}
-          /> */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              disabled={isSaving || isPublishing}
-              onClick={form.handleSubmit((values) => onSubmit(values, true))}
-            >
-              {isSaving ? <LoadingSpinner /> : <Save className="size-4 mr-2" />}
-              {isSaving ? "Saving" : "Save Draft"}
-            </Button>
-            <Button
-              type="submit"
-              form="post-form"
-              disabled={isSaving || isPublishing}
-              onClick={form.handleSubmit((values) => onSubmit(values, false))}
-            >
-              {isPublishing ? (
-                <LoadingSpinner />
-              ) : (
-                <Send className="size-4 mr-2" />
-              )}
-              {isPublishing ? "Publishing" : "Publish"}
-            </Button>
-          </div>
+          />
         </div>
-
-        <form
-          id="post-form"
-          onSubmit={form.handleSubmit((values) => onSubmit(values, false))}
-          className="space-y-8"
-        >
-          {/* Title */}
-          <FormField
-            control={form.control}
-            name="title"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Post Title</FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder="Enter your post title..."
-                    className="text-lg"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Description */}
-          <FormField
-            control={form.control}
-            name="shortDescription"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Short Description</FormLabel>
-                <FormControl>
-                  <Textarea
-                    placeholder="Enter a brief description..."
-                    className="min-h-[100px]"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Categories */}
-          <FormField
-            control={form.control}
-            name="categoryIds"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Categories</FormLabel>
-                <FormControl>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-between"
-                      >
-                        {field.value?.length
-                          ? `${field.value.length} selected`
-                          : "Select categories"}
-                        <ChevronsUpDown className="h-4 w-4 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent align="start">
-                      <Command>
-                        <CommandInput placeholder="Search categories..." />
-                        <CommandEmpty>No category found.</CommandEmpty>
-                        <CommandGroup>
-                          {categories.map((category) => (
-                            <CommandItem
-                              key={category.id}
-                              onSelect={() => {
-                                const values = field.value || [];
-                                field.onChange(
-                                  values.includes(category.id)
-                                    ? values.filter((id) => id !== category.id)
-                                    : [...values, category.id]
-                                );
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  field.value?.includes(category.id)
-                                    ? "opacity-100"
-                                    : "opacity-0"
-                                )}
-                              />
-                              {category.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </FormControl>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {field.value?.map((categoryId) => {
-                    const category = categories.find(
-                      (c) => c.id === categoryId
-                    );
-                    return (
-                      category && (
-                        <Badge key={category.id} variant="secondary">
-                          {category.name}
-                        </Badge>
-                      )
-                    );
-                  })}
+      )}
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit((data) => onSubmit(data, true))}>
+          <div className="mx-auto p-6">
+            <div className="mb-8">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <Link href="/cms/posts">
+                    <Button variant="outline" size="sm">
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Back to Posts
+                    </Button>
+                  </Link>
                 </div>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Featured Image */}
-          <FormField
-            control={form.control}
-            name="postImg"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Featured Image</FormLabel>
-                <FormControl>
-                  <div className="space-y-4">
-                    {/* Image Preview */}
-                    {field.value && (
-                      <div className="relative w-[200px] aspect-video rounded-md overflow-hidden border">
-                        <LoadingImage
-                          src={field.value}
-                          alt="Featured"
-                          className="object-cover"
-                          fill
-                          sizes="200px"
-                        />
-                      </div>
+                <div className="flex items-center gap-2">
+                  <Button type="submit" variant="outline" disabled={isSaving}>
+                    {isSaving && !isPublishing ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4 mr-2" />
                     )}
-                    {/* Upload Controls */}
-                    <div className="flex items-center gap-4">
-                      {field.value ? (
-                        <>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            disabled={isUploadingImage}
-                            onClick={() => {
-                              const input = document.createElement("input");
-                              input.type = "file";
-                              input.accept = "image/*";
-                              input.onchange = (e) => {
-                                const file = (e.target as HTMLInputElement)
-                                  .files?.[0];
-                                if (file) handleFeaturedImageUpload(file);
-                              };
-                              input.click();
-                            }}
-                          >
-                            <ImageIcon className="h-4 w-4 mr-2" />
-                            {isUploadingImage ? "Uploading..." : "Change Image"}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            disabled={isUploadingImage}
-                            onClick={() => {
-                              field.onChange(null);
-                            }}
-                          >
-                            <X className="h-4 w-4 mr-2" />
-                            Remove
-                          </Button>
-                        </>
-                      ) : (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={isUploadingImage}
-                          onClick={() => {
-                            const input = document.createElement("input");
-                            input.type = "file";
-                            input.accept = "image/*";
-                            input.onchange = (e) => {
-                              const file = (e.target as HTMLInputElement)
-                                .files?.[0];
-                              if (file) handleFeaturedImageUpload(file);
-                            };
-                            input.click();
-                          }}
-                        >
-                          <ImageIcon className="h-4 w-4 mr-2" />
-                          {isUploadingImage ? "Uploading..." : "Add Image"}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+                    Save Draft
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={isSaving}
+                    onClick={() => onSubmit(form.getValues(), false)}
+                  >
+                    {isPublishing ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4 mr-2" />
+                    )}
+                    Publish
+                  </Button>
+                </div>
+              </div>
+            </div>
 
-          {/* Content Editor */}
-          <FormField
-            control={form.control}
-            name="content"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Content</FormLabel>
+            {/* Form Content */}
+            <div className="grid gap-8">
+              <Card>
+                <CardContent className="p-6">
+                  <div className="grid gap-6">
+                    {/* Title */}
+                    <FormField
+                      control={form.control}
+                      name="title"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Title</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Enter post title"
+                              {...field}
+                              className="text-lg"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Slug */}
+                    <FormField
+                      control={form.control}
+                      name="slug"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Slug</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="post-url-slug"
+                              {...field}
+                              readOnly
+                              className="bg-muted cursor-not-allowed"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Auto-generated from title
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Description */}
+                    <FormField
+                      control={form.control}
+                      name="shortDescription"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Short Description</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Brief description of the post"
+                              className="resize-none h-24"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Categories */}
+                    <FormField
+                      control={form.control}
+                      name="selectedCategories"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Categories</FormLabel>
+                          <div className="space-y-4">
+                            {/* Selected Categories */}
+                            <div className="flex flex-wrap gap-2">
+                              {selectedCategories.map((category) => (
+                                <div
+                                  key={category.id}
+                                  className="flex items-center gap-1 bg-secondary text-secondary-foreground px-3 py-1 rounded-full"
+                                >
+                                  <span className="text-sm">
+                                    {category.name}
+                                  </span>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-4 w-4 p-0 hover:bg-transparent"
+                                    onClick={() =>
+                                      handleRemoveCategory(category.id)
+                                    }
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Category Selector */}
+                            <Select onValueChange={handleCategorySelect}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Add a category" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {categories
+                                  .filter(
+                                    (category) =>
+                                      !selectedCategories.some(
+                                        (sc) => sc.id === category.id
+                                      )
+                                  )
+                                  .map((category) => (
+                                    <SelectItem
+                                      key={category.id}
+                                      value={category.id}
+                                    >
+                                      {category.name}
+                                    </SelectItem>
+                                  ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Featured Image */}
+                    <FormField
+                      control={form.control}
+                      name="postImg"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Featured Image</FormLabel>
+                          <FormControl>
+                            <div className="space-y-4">
+                              {field.value && (
+                                <div className="relative w-[400px] h-[400px] overflow-hidden rounded-lg border">
+                                  <LoadingImage
+                                    src={field.value}
+                                    alt="Featured"
+                                    fill
+                                    className="object-cover"
+                                  />
+                                </div>
+                              )}
+                              <div className="flex items-center gap-4">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  disabled={isUploadingImage}
+                                  onClick={() => {
+                                    const input =
+                                      document.createElement("input");
+                                    input.type = "file";
+                                    input.accept = "image/*";
+                                    input.onchange = (e) => {
+                                      const file = (
+                                        e.target as HTMLInputElement
+                                      ).files?.[0];
+                                      if (file) handleImageUpload(file);
+                                    };
+                                    input.click();
+                                  }}
+                                >
+                                  {isUploadingImage ? (
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  ) : (
+                                    <ImageIcon className="h-4 w-4 mr-2" />
+                                  )}
+                                  {field.value ? "Change Image" : "Add Image"}
+                                </Button>
+                                {field.value && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() =>
+                                      form.setValue("postImg", "", {
+                                        shouldDirty: true,
+                                      })
+                                    }
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Content Sections */}
+              {sections.length > 0 && (
                 <Card>
-                  <CardContent className="p-4" data-registry="plate">
-                    <SettingsProvider>
-                      <PlateEditorComponent
-                        initialContent={field.value}
-                        editorRef={editorRef}
-                      />
-                    </SettingsProvider>
+                  <CardContent className="p-6">
+                    <SortableSections
+                      sections={sections}
+                      onSectionsChange={setSections}
+                    >
+                      {(section) => {
+                        switch (section.type) {
+                          case "text":
+                            return (
+                              <TextSection
+                                section={section}
+                                onUpdate={handleUpdateSection}
+                                onDelete={handleDeleteSection}
+                              />
+                            );
+                          case "table":
+                            return (
+                              <TableSection
+                                section={section}
+                                onUpdate={handleUpdateSection}
+                                onDelete={handleDeleteSection}
+                              />
+                            );
+                          case "blockquote":
+                            return (
+                              <BlockquoteSection
+                                section={section}
+                                onUpdate={handleUpdateSection}
+                                onDelete={handleDeleteSection}
+                              />
+                            );
+                          case "testimonial":
+                            return (
+                              <TestimonialSection
+                                section={section}
+                                onUpdate={handleUpdateSection}
+                                onDelete={handleDeleteSection}
+                              />
+                            );
+                          case "image":
+                            return (
+                              <ImageSection
+                                section={section}
+                                onUpdate={handleUpdateSection}
+                                onDelete={handleDeleteSection}
+                              />
+                            );
+                          case "list":
+                            return (
+                              <ListSection
+                                section={section}
+                                onUpdate={handleUpdateSection}
+                                onDelete={handleDeleteSection}
+                              />
+                            );
+                          case "post-author":
+                            return (
+                              <PostAuthorSection
+                                key={section.id}
+                                section={section}
+                                onUpdate={handleUpdateSection}
+                                onDelete={handleDeleteSection}
+                              />
+                            );
+                          default:
+                            return null;
+                        }
+                      }}
+                    </SortableSections>
                   </CardContent>
                 </Card>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+              )}
+
+              {/* Fixed Add Section Button */}
+              <div className="fixed bottom-6 right-6">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="icon"
+                      className="h-12 w-12 rounded-full shadow-lg"
+                    >
+                      <Plus className="h-6 w-6" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[200px]">
+                    {sectionTypes.map(({ type, label }) => (
+                      <DropdownMenuItem
+                        key={type}
+                        onClick={() => handleAddSection(type as SectionType)}
+                        className="cursor-pointer"
+                      >
+                        {label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+          </div>
         </form>
-      </div>
-    </Form>
+      </Form>
+    </div>
   );
 }

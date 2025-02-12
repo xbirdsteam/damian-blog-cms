@@ -1,17 +1,29 @@
 export interface TimelineItem {
+    id: string;
     year: string;
+    title: string;
     content: string;
+}
+
+export interface LinkItem {
+    id: string;
+    url: string;
+    title: string;
 }
 
 export interface AboutData {
     id: string;
     title: string;
-    introduction: string;
+    mission: string;
+    vision: string;
+    where_i_am: string;
+    links: LinkItem[];
     image_url: string | null;
     timelines: TimelineItem[];
-    closing_paragraph: string;
-    seo_title: string | null;
-    seo_description: string | null;
-    seo_keywords: string | null;
-    og_image: string | null;
+    seo_config?: {
+        meta_title: string;
+        meta_description: string;
+        meta_keywords: string;
+        og_image: string | null;
+    } | null;
 } 

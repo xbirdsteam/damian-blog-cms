@@ -10,13 +10,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, Loader2 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { TimelineItem } from "@/types/about";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-
-interface TimelineItem {
-  year: string;
-  content: string;
-}
+import { toast } from "sonner";
+import { v4 as uuidv4 } from "uuid";
 
 interface TimelineDialogProps {
   open: boolean;
@@ -28,18 +27,18 @@ interface TimelineDialogProps {
 export function TimelineDialog({
   open,
   onOpenChange,
-  items,
+  items: initialItems,
   onSave,
 }: TimelineDialogProps) {
-  const [timelineItems, setTimelineItems] = useState<TimelineItem[]>(items);
+  const [items, setItems] = useState<TimelineItem[]>(initialItems);
   const [isSaving, setIsSaving] = useState(false);
 
   const addItem = () => {
-    setTimelineItems([...timelineItems, { year: "", content: "" }]);
+    setItems([...items, { id: uuidv4(), year: "", title: "", content: "" }]);
   };
 
   const removeItem = (index: number) => {
-    setTimelineItems(timelineItems.filter((_, i) => i !== index));
+    setItems(items.filter((_, i) => i !== index));
   };
 
   const updateItem = (
@@ -47,101 +46,89 @@ export function TimelineDialog({
     field: keyof TimelineItem,
     value: string
   ) => {
-    setTimelineItems(
-      timelineItems.map((item, i) =>
-        i === index ? { ...item, [field]: value } : item
-      )
+    setItems(
+      items.map((item, i) => (i === index ? { ...item, [field]: value } : item))
     );
   };
 
   const handleSave = async () => {
     try {
       setIsSaving(true);
-      const sortedItems = [...timelineItems].sort(
-        (a, b) => Number(a.year) - Number(b.year)
-      );
-      await onSave(sortedItems);
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await onSave(items);
       onOpenChange(false);
+    } catch (error) {
+      console.error("Error saving timeline:", error);
+      toast.error("Failed to save timeline");
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
-    if (e.key === "Enter" && !e.shiftKey && !isSaving) {
-      e.preventDefault();
-      if (index === timelineItems.length - 1) {
-        handleSave();
-      } else {
-        const nextInput = document.querySelector(
-          `[data-index="${index + 1}"]`
-        ) as HTMLInputElement;
-        nextInput?.focus();
-      }
-    }
-  };
-
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(open) => !isSaving && onOpenChange(open)}
-    >
-      <DialogContent className="max-h-[80vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit Timeline History</DialogTitle>
+          <DialogTitle>Edit Timeline</DialogTitle>
           <DialogDescription>
-            Add, remove, or modify timeline entries. Items will be automatically
-            sorted by year.
+            Add or remove timeline items to showcase your journey.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
-          {timelineItems.map((item, index) => (
-            <div key={index} className="flex items-start gap-2">
-              <Input
-                data-index={index}
-                placeholder="Year"
-                value={item.year}
-                onChange={(e) => updateItem(index, "year", e.target.value)}
-                className="w-24"
-                spellCheck={false}
-                onKeyDown={(e) => handleKeyDown(e, index)}
-                disabled={isSaving}
-              />
-              <Input
-                data-index={index}
-                placeholder="Description"
+
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+          {items.map((item, index) => (
+            <div key={index} className="space-y-2 p-4 border rounded-lg">
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Year"
+                  value={item.year}
+                  onChange={(e) => updateItem(index, "year", e.target.value)}
+                  className="w-24"
+                />
+                <Input
+                  placeholder="Title"
+                  value={item.title}
+                  onChange={(e) => updateItem(index, "title", e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeItem(index)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+              <Textarea
+                placeholder="Content"
                 value={item.content}
                 onChange={(e) => updateItem(index, "content", e.target.value)}
-                spellCheck={false}
-                onKeyDown={(e) => handleKeyDown(e, index)}
-                disabled={isSaving}
+                className="resize-none"
+                rows={3}
               />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => removeItem(index)}
-                className="shrink-0"
-                disabled={isSaving}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
             </div>
           ))}
+
           <Button
+            type="button"
             variant="outline"
-            className="w-full"
             onClick={addItem}
-            disabled={isSaving}
+            className="w-full"
           >
             <Plus className="mr-2 h-4 w-4" />
             Add Timeline Item
           </Button>
         </div>
+
         <DialogFooter>
           <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isSaving ? "Saving..." : "Save Changes"}
+            {isSaving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              "Save Changes"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -5,12 +5,13 @@ import { Form } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useHomeSettings } from "@/hooks/use-home-settings";
+import { useSEO } from "@/hooks/use-seo";
 import { uploadHomeImage } from "@/services/home-service";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ImageIcon, Layout, Mail, Type } from "lucide-react";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
+import { v4 as uuidv4 } from "uuid";
 import * as z from "zod";
 import { Card, CardContent, CardHeader } from "../ui/card";
 import { AboutSection } from "./about-section";
@@ -22,12 +23,14 @@ import { formSchema, seoSchema } from "./types";
 type FormValues = z.infer<typeof formSchema>;
 
 export function HomeEditor() {
+  const { data, isLoading: isSettingsLoading, isSaving } = useHomeSettings();
+
+  const seoRefId = data?.id || uuidv4();
   const {
-    data,
-    isLoading: isSettingsLoading,
-    isSaving,
-    handleSectionUpdate,
-  } = useHomeSettings();
+    seoConfig,
+    updateSEO,
+    isUpdating: isUpdatingSEO,
+  } = useSEO(seoRefId, "home");
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -124,22 +127,23 @@ export function HomeEditor() {
   }, [data, form]);
 
   const handleSeoSubmit = async (values: z.infer<typeof seoSchema>) => {
-    if (!data?.id) return;
-
     try {
-      await handleSectionUpdate(data.id, "seo", {
-        seo_title: values.title,
-        seo_description: values.description,
-        seo_keywords: values.keywords,
-        og_image: values.og_image || "",
-      });
+      const payload: any = {
+        seo_ref_id: seoRefId,
+        meta_title: values.title,
+        meta_description: values.description,
+        meta_keywords: values.keywords,
+        og_image: values.og_image || null,
+        slug: "home",
+      };
 
-      // Update form values
-      form.setValue("seo", values);
-      toast.success("SEO settings updated successfully");
+      if (seoConfig?.id) {
+        payload.id = seoConfig.id;
+      }
+
+      await updateSEO(payload);
     } catch (error) {
       console.error("Error updating SEO settings:", error);
-      toast.error("Failed to update SEO settings");
     }
   };
 
@@ -225,20 +229,17 @@ export function HomeEditor() {
       ) : (
         <Form {...form}>
           <form onSubmit={handleSubmit} className="space-y-8">
-            <div className="flex items-center justify-between border-b pb-4">
-              <h1 className="text-2xl font-semibold tracking-tight">
-                Home Page Settings
-              </h1>
+            <div className="flex items-center border-b pb-4">
               <SeoSettingsModal
                 defaultValues={{
-                  title: data?.seo_title || "",
-                  description: data?.seo_description || "",
-                  keywords: data?.seo_keywords || "",
-                  og_image: data?.og_image || "",
+                  title: seoConfig?.meta_title || "",
+                  description: seoConfig?.meta_description || "",
+                  keywords: seoConfig?.meta_keywords || "",
+                  og_image: seoConfig?.og_image || "",
                 }}
                 onSubmit={handleSeoSubmit}
                 onImageUpload={handleSeoImageUpload}
-                isSaving={isSaving}
+                isSaving={isUpdatingSEO}
                 pageName="Home"
               />
             </div>

@@ -1,6 +1,7 @@
 'use client'
 import { CreatePostOptions, PaginatedPosts, Post, postService, PostStats } from "@/services/post-service";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 // Separate hook for stats to avoid duplicate queries
 export function usePostStats() {
@@ -13,15 +14,20 @@ export function usePostStats() {
 }
 
 interface UsePostsOptions {
-    category?: string;
+    categories?: string[];
     enabled?: boolean;
     page?: number;
     perPage?: number;
+    search?: string;
 }
 
 export function usePosts(options: UsePostsOptions = {}) {
     const queryClient = useQueryClient();
-    const queryKey = ["posts", { category: options.category, page: options.page || 1 }];
+    const queryKey = ["posts", {
+        categories: options.categories,
+        page: options.page || 1,
+        search: options.search
+    }];
 
     const {
         data: paginatedPosts,
@@ -29,11 +35,17 @@ export function usePosts(options: UsePostsOptions = {}) {
         refetch,
     } = useQuery<PaginatedPosts>({
         queryKey,
-        queryFn: () => postService.getPosts({
-            category: options.category,
-            page: options.page || 1,
-            perPage: options.perPage || 12
-        }),
+        queryFn: async () => {
+            const result = await postService.getPosts(options);
+            // Transform the result to match PaginatedPosts interface
+            return {
+                posts: result.posts,
+                page: result.currentPage,
+                perPage: result.perPage,
+                total: result.total,
+                totalPages: result.totalPages,
+            };
+        },
         enabled: options.enabled !== false,
         staleTime: 1000 * 60 * 5,
         gcTime: 1000 * 60 * 15,
@@ -50,6 +62,10 @@ export function usePosts(options: UsePostsOptions = {}) {
                 queryKey: ["posts-stats"]
             });
         },
+        onError: (error) => {
+            console.error("Error creating post:", error);
+            toast.error("Failed to create post");
+        },
     });
 
     const { mutateAsync: updatePost, isPending: isUpdating } = useMutation({
@@ -62,6 +78,11 @@ export function usePosts(options: UsePostsOptions = {}) {
             queryClient.invalidateQueries({
                 queryKey: ["posts-stats"]
             });
+            toast.success("Post updated successfully");
+        },
+        onError: (error) => {
+            console.error("Error updating post:", error);
+            toast.error("Failed to update post");
         },
     });
 
@@ -106,7 +127,7 @@ export function usePost(postId: string) {
         staleTime: 1000 * 60 * 5,
         initialData: () => {
             // Use posts list as initial data source if available
-            const posts = queryClient.getQueryData<Post[]>(["posts"]);
+            const posts = queryClient.getQueryData<PaginatedPosts>(["posts"])?.posts;
             return posts?.find(post => post.id === postId);
         },
     });
