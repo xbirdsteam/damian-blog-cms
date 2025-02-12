@@ -463,14 +463,23 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <Link href="/cms/posts">
-                    <Button variant="outline" size="sm">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="cursor-pointer"
+                    >
                       <ArrowLeft className="h-4 w-4 mr-2" />
                       Back to Posts
                     </Button>
                   </Link>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button type="submit" variant="outline" disabled={isSaving}>
+                  <Button
+                    type="submit"
+                    variant="outline"
+                    disabled={isSaving}
+                    className="cursor-pointer"
+                  >
                     {isSaving && !isPublishing ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -489,6 +498,7 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
                     onClick={() =>
                       form.handleSubmit((data) => onSubmit(data, false))()
                     }
+                    className="cursor-pointer"
                   >
                     {isPublishing ? (
                       <>
@@ -588,7 +598,7 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
                                     type="button"
                                     variant="ghost"
                                     size="icon"
-                                    className="h-4 w-4 p-0 hover:bg-transparent"
+                                    className="h-4 w-4 p-0 hover:bg-transparent cursor-pointer"
                                     onClick={() =>
                                       handleRemoveCategory(category.id)
                                     }
@@ -665,6 +675,7 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
                                     };
                                     input.click();
                                   }}
+                                  className="cursor-pointer"
                                 >
                                   {isUploadingImage ? (
                                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -778,7 +789,7 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
                   <DropdownMenuTrigger asChild>
                     <Button
                       size="icon"
-                      className="h-12 w-12 rounded-full shadow-lg"
+                      className="h-12 w-12 rounded-full shadow-lg cursor-pointer"
                     >
                       <Plus className="h-6 w-6" />
                     </Button>
