@@ -103,6 +103,7 @@ export const postService = {
         if (options.post_img) updates.post_img = options.post_img;
         if (options.status) updates.status = options.status;
         if (options.content) updates.content = JSON.stringify(options.content);
+        if (options.publish_date) updates.publish_date = options.publish_date;
 
         // Get the post's created_at timestamp
         const { data: currentPost } = await supabase
@@ -158,6 +159,7 @@ export const postService = {
             content: JSON.stringify(options.content),
             created_at: now,
             updated_at: now,
+            publish_date: options.publish_date,
         }).select().single();
 
         if (error) throw error;

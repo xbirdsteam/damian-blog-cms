@@ -1,7 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 "use client";
 
-import { SeoSettingsModal } from "@/components/common/seo-settings-modal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -31,7 +30,6 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useCategories } from "@/hooks/use-categories";
 import { usePosts } from "@/hooks/use-posts";
-import { useSEO } from "@/hooks/use-seo";
 import { slugify } from "@/lib/utils";
 import { Post } from "@/services/post-service";
 import { uploadService } from "@/services/upload-service";
@@ -52,7 +50,6 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import * as z from "zod";
-import { seoSchema } from "../home/types";
 import {
   BlockquoteSection,
   ImageSection,
@@ -86,11 +83,7 @@ interface PostEditorProps {
 // Update PostStatus type to match CreatePostOptions
 type PostStatus = "draft" | "published";
 
-export function PostEditor({
-  initialData,
-  mode,
-  post_created_at,
-}: PostEditorProps) {
+export function PostEditor({ initialData, mode }: PostEditorProps) {
   const { categories } = useCategories();
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const { createPost, updatePost, isCreating, isUpdating } = usePosts();
@@ -458,93 +451,14 @@ export function PostEditor({
     );
   };
 
-  // Update SEO hook to use dynamic slug
-  const seoRefId = initialData?.id || "";
-  const postSlug = form.watch("slug"); // Watch for slug changes
-  const {
-    seoConfig,
-    updateSEO,
-    isUpdating: isUpdatingSEO,
-  } = useSEO(seoRefId, `gastronomy/${postSlug}`);
-
-  // Update SEO submit handler to use the current slug
-  const handleSeoSubmit = async (values: z.infer<typeof seoSchema>) => {
-    try {
-      const currentSlug = form.getValues("slug");
-      if (!currentSlug) {
-        toast.error("Please set a post title first to generate the slug");
-        return;
-      }
-
-      const payload: any = {
-        seo_ref_id: seoRefId,
-        meta_title: values.title,
-        meta_description: values.description,
-        meta_keywords: values.keywords,
-        og_image: values.og_image || null,
-        slug: `gastronomy/${currentSlug}`, // Use the full path
-      };
-
-      if (seoConfig?.id) {
-        payload.id = seoConfig.id;
-      }
-
-      await updateSEO(payload);
-    } catch (error) {
-      console.error("Error updating SEO settings:", error);
-      toast.error("Failed to update SEO settings");
-    }
-  };
-
-  // Update SEO image upload handler to use the slug in the path
-  const handleSeoImageUpload = async (file: File) => {
-    try {
-      const currentSlug = form.getValues("slug");
-      if (!currentSlug) {
-        throw new Error("Post slug not available");
-      }
-
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("path", `gastronomy/${currentSlug}/seo/og-image`);
-
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) throw new Error("Failed to upload image");
-
-      const { url } = await response.json();
-      return url;
-    } catch (error) {
-      console.error("Error uploading SEO image:", error);
-      throw error;
-    }
-  };
-
   return (
     <div>
-      {/* Header */}
-      {mode === "edit" && (
-        <div className="flex w-full justify-end px-6 pt-10">
-          <SeoSettingsModal
-            defaultValues={{
-              title: seoConfig?.meta_title || "",
-              description: seoConfig?.meta_description || "",
-              keywords: seoConfig?.meta_keywords || "",
-              og_image: seoConfig?.og_image || "",
-            }}
-            onSubmit={handleSeoSubmit}
-            onImageUpload={handleSeoImageUpload}
-            isSaving={isUpdatingSEO}
-            pageName="Post"
-          />
-        </div>
-      )}
       <Form {...form}>
         <form onSubmit={form.handleSubmit((data) => onSubmit(data, true))}>
           <div className="mx-auto p-6">
+            <h1 className="text-3xl font-bold mb-4">
+              {mode === "create" ? "Create Post" : "Edit Post"}
+            </h1>
             <div className="mb-8">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
@@ -558,34 +472,44 @@ export function PostEditor({
                 <div className="flex items-center gap-2">
                   <Button type="submit" variant="outline" disabled={isSaving}>
                     {isSaving && !isPublishing ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
                     ) : (
-                      <Save className="h-4 w-4 mr-2" />
+                      <>
+                        <Save className="mr-2 h-4 w-4" />
+                        Save Draft
+                      </>
                     )}
-                    Save Draft
                   </Button>
                   <Button
                     type="button"
                     disabled={isSaving}
-                    onClick={() => onSubmit(form.getValues(), false)}
+                    onClick={() =>
+                      form.handleSubmit((data) => onSubmit(data, false))()
+                    }
                   >
                     {isPublishing ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Publishing...
+                      </>
                     ) : (
-                      <Send className="h-4 w-4 mr-2" />
+                      <>
+                        <Send className="mr-2 h-4 w-4" />
+                        Publish
+                      </>
                     )}
-                    Publish
                   </Button>
                 </div>
               </div>
             </div>
 
-            {/* Form Content */}
             <div className="grid gap-8">
               <Card>
                 <CardContent className="p-6">
                   <div className="grid gap-6">
-                    {/* Title */}
                     <FormField
                       control={form.control}
                       name="title"
@@ -604,7 +528,6 @@ export function PostEditor({
                       )}
                     />
 
-                    {/* Slug */}
                     <FormField
                       control={form.control}
                       name="slug"
@@ -627,7 +550,6 @@ export function PostEditor({
                       )}
                     />
 
-                    {/* Description */}
                     <FormField
                       control={form.control}
                       name="shortDescription"
@@ -646,7 +568,6 @@ export function PostEditor({
                       )}
                     />
 
-                    {/* Categories */}
                     <FormField
                       control={form.control}
                       name="selectedCategories"
@@ -654,7 +575,6 @@ export function PostEditor({
                         <FormItem>
                           <FormLabel>Categories</FormLabel>
                           <div className="space-y-4">
-                            {/* Selected Categories */}
                             <div className="flex flex-wrap gap-2">
                               {selectedCategories.map((category) => (
                                 <div
@@ -679,7 +599,6 @@ export function PostEditor({
                               ))}
                             </div>
 
-                            {/* Category Selector */}
                             <Select onValueChange={handleCategorySelect}>
                               <FormControl>
                                 <SelectTrigger>
@@ -710,7 +629,6 @@ export function PostEditor({
                       )}
                     />
 
-                    {/* Featured Image */}
                     <FormField
                       control={form.control}
                       name="postImg"
@@ -780,7 +698,6 @@ export function PostEditor({
                 </CardContent>
               </Card>
 
-              {/* Content Sections */}
               {sections.length > 0 && (
                 <Card>
                   <CardContent className="p-6">
@@ -856,7 +773,6 @@ export function PostEditor({
                 </Card>
               )}
 
-              {/* Fixed Add Section Button */}
               <div className="fixed bottom-6 right-6">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
