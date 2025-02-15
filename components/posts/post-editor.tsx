@@ -30,6 +30,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useCategories } from "@/hooks/use-categories";
 import { usePosts } from "@/hooks/use-posts";
+import { useSEO } from "@/hooks/use-seo";
 import { slugify } from "@/lib/utils";
 import { Post } from "@/services/post-service";
 import { uploadService } from "@/services/upload-service";
@@ -60,16 +61,17 @@ import {
 import { ListSection } from "./sections/list-section";
 import { PostAuthorSection } from "./sections/post-author-section";
 import { SortableSections } from "./sections/sortable-sections";
+import { PostSEOConfigModal, SeoFormValues } from "./seo-config-modal";
 
+// Update form schema to match the actual post structure
 const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
   slug: z.string().min(1, "Slug is required"),
-  shortDescription: z.string().min(1, "Short description is required"),
-  selectedCategories: z
-    .array(z.string())
-    .min(1, "At least one category is required"),
-  postImg: z.string().nullable().optional(),
-  sections: z.array(z.any()).optional(),
+  short_description: z.string().min(1, "Short description is required"),
+  post_img: z.string().nullable().optional(),
+  status: z.enum(["draft", "published"]),
+  categoryIds: z.array(z.string()),
+  content: z.any(), // This will store the sections
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -117,16 +119,17 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
     })) || []
   );
 
-  // Initialize form with initial data
+  // Initialize form with correct structure
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       title: initialData?.title || "",
       slug: initialData?.slug || "",
-      shortDescription: initialData?.short_description || "",
-      selectedCategories:
-        initialData?.posts_categories?.map((pc) => pc.categories.id) || [],
-      postImg: initialData?.post_img || "",
+      short_description: initialData?.short_description || "",
+      post_img: initialData?.post_img || "",
+      status: initialData?.status || "draft",
+      categoryIds: initialData?.posts_categories?.map((pc) => pc.categories.id) || [],
+      content: initialData?.content || "",
     },
   });
 
@@ -137,10 +140,11 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
       form.reset({
         title: initialData.title,
         slug: initialData.slug,
-        shortDescription: initialData.short_description || "",
-        selectedCategories:
-          initialData?.posts_categories?.map((pc) => pc.categories.id) || [],
-        postImg: initialData.post_img || "",
+        short_description: initialData.short_description || "",
+        post_img: initialData.post_img || "",
+        status: initialData.status || "draft",
+        categoryIds: initialData?.posts_categories?.map((pc) => pc.categories.id) || [],
+        content: initialData.content || "",
       });
 
       // Update sections
@@ -175,34 +179,33 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
   const onSubmit = async (values: FormValues, isDraft: boolean = true) => {
     try {
       setIsPublishing(!isDraft);
-
-      // Explicitly type the status
       const status: PostStatus = isDraft ? "draft" : "published";
-
-      const postData = {
-        title: values.title,
-        slug: values.slug,
-        short_description: values.shortDescription,
-        post_img: values.postImg || "",
-        status, // Use the typed status
-        categoryIds: values.selectedCategories,
-        content: sections,
-        publish_date: isDraft ? null : new Date(),
-      };
 
       if (mode === "edit" && initialData?.id) {
         await updatePost({
           id: initialData.id,
-          ...postData,
-        } as const); // Use const assertion to preserve literal types
-        toast.success(
-          isDraft ? "Post updated successfully" : "Post published successfully"
-        );
+          title: values.title,
+          slug: values.slug,
+          short_description: values.short_description,
+          post_img: values.post_img || "",
+          content: sections, // Pass sections directly as array
+          status,
+          categoryIds: values.categoryIds,
+          publish_date: isDraft ? null : new Date(),
+        });
+        toast.success(isDraft ? "Post updated successfully" : "Post published successfully");
       } else {
-        await createPost(postData);
-        toast.success(
-          isDraft ? "Post created successfully" : "Post published successfully"
-        );
+        await createPost({
+          title: values.title,
+          slug: values.slug,
+          short_description: values.short_description,
+          post_img: values.post_img || "",
+          content: sections, // Pass sections directly as array
+          status,
+          categoryIds: values.categoryIds,
+          publish_date: isDraft ? null : new Date(),
+        });
+        toast.success(isDraft ? "Post created successfully" : "Post published successfully");
       }
     } catch (error) {
       console.error(error);
@@ -220,7 +223,7 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
       const url = await uploadService.uploadImage(file);
 
       // Update form with the new image URL
-      form.setValue("postImg", url, { shouldDirty: true });
+      form.setValue("post_img", url, { shouldDirty: true });
 
       toast.success("Image uploaded successfully");
     } catch (error) {
@@ -433,7 +436,7 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
       ];
       setSelectedCategories(newCategories);
       form.setValue(
-        "selectedCategories",
+        "categoryIds",
         newCategories.map((c) => c.id),
         { shouldDirty: true }
       );
@@ -445,80 +448,133 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
     const newCategories = selectedCategories.filter((c) => c.id !== categoryId);
     setSelectedCategories(newCategories);
     form.setValue(
-      "selectedCategories",
+      "categoryIds",
       newCategories.map((c) => c.id),
       { shouldDirty: true }
     );
   };
 
+  // Add SEO hook
+  const {
+    seoConfig,
+    updateSEO,
+    isUpdating: isUpdatingSEO
+  } = useSEO(initialData?.id || "");
+
+  const handleSEOSubmit = async (seoValues: SeoFormValues) => {
+    try {
+      if (!initialData?.id) {
+        toast.error("Please save the post first before configuring SEO");
+        return;
+      }
+
+      const postSlug = form.getValues("slug");
+
+      await updateSEO({
+        seo_ref_id: initialData.id,
+        meta_title: seoValues.title,
+        meta_description: seoValues.description,
+        meta_keywords: seoValues.keywords,
+        og_image: seoValues.og_image,
+        og_twitter_image: seoValues.og_twitter_image,
+        slug: `gastronomy/${postSlug}`, // We still need this for the URL structure
+      });
+      toast.success("SEO settings updated successfully");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to update SEO settings");
+    }
+  };
+
+  const handleSEOImageUpload = async (file: File, type: "default" | "twitter") => {
+    try {
+      const url = await uploadService.uploadImage(file);
+      return url;
+    } catch (error) {
+      toast.error("Failed to upload image");
+      throw error;
+    }
+  };
+
   return (
     <div>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit((data) => onSubmit(data, true))}>
-          <div className="mx-auto p-6">
-            <h1 className="text-3xl font-bold mb-4">
-              {mode === "create" ? "Create Post" : "Edit Post"}
-            </h1>
-            <div className="mb-8">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <Link href="/cms/posts">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="cursor-pointer"
-                    >
-                      <ArrowLeft className="h-4 w-4 mr-2" />
-                      Back to Posts
-                    </Button>
-                  </Link>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="submit"
-                    variant="outline"
-                    disabled={isSaving}
-                    className="cursor-pointer"
-                  >
-                    {isSaving && !isPublishing ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      <>
-                        <Save className="mr-2 h-4 w-4" />
-                        Save Draft
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    type="button"
-                    disabled={isSaving}
-                    onClick={() =>
-                      form.handleSubmit((data) => onSubmit(data, false))()
-                    }
-                    className="cursor-pointer"
-                  >
-                    {isPublishing ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Publishing...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="mr-2 h-4 w-4" />
-                        Publish
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </div>
+      <div className="mx-auto p-6">
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <Link href="/cms/posts">
+              <Button variant="outline" size="sm" className="cursor-pointer">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Posts
+              </Button>
+            </Link>
+          </div>
+          <div className="flex items-center gap-2">
+            <PostSEOConfigModal
+              defaultValues={{
+                title: seoConfig?.meta_title || "",
+                description: seoConfig?.meta_description || "",
+                keywords: seoConfig?.meta_keywords || "",
+                og_image: seoConfig?.og_image || "",
+                og_twitter_image: seoConfig?.og_twitter_image || "",
+              }}
+              onSubmit={handleSEOSubmit}
+              onImageUpload={handleSEOImageUpload}
+              isSaving={isUpdatingSEO}
+              disabled={mode === "create"}
+            />
+          </div>
+        </div>
 
-            <div className="grid gap-8">
+        <h1 className="text-3xl font-bold mb-4">
+          {mode === "create" ? "Create Post" : "Edit Post"}
+        </h1>
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit((data) => onSubmit(data, true))}>
+            <div className="space-y-6">
               <Card>
                 <CardContent className="p-6">
+                  <div className="flex justify-end mb-4">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="submit"
+                        variant="outline"
+                        disabled={isSaving}
+                        className="cursor-pointer"
+                      >
+                        {isSaving && !isPublishing ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="mr-2 h-4 w-4" />
+                            Save Draft
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        disabled={isSaving}
+                        onClick={() => onSubmit(form.getValues(), false)}
+                        className="cursor-pointer"
+                      >
+                        {isPublishing ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Publishing...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="mr-2 h-4 w-4" />
+                            Publish
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
                   <div className="grid gap-6">
                     <FormField
                       control={form.control}
@@ -562,7 +618,7 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
 
                     <FormField
                       control={form.control}
-                      name="shortDescription"
+                      name="short_description"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Short Description</FormLabel>
@@ -580,7 +636,7 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
 
                     <FormField
                       control={form.control}
-                      name="selectedCategories"
+                      name="categoryIds"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Categories</FormLabel>
@@ -641,7 +697,7 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
 
                     <FormField
                       control={form.control}
-                      name="postImg"
+                      name="post_img"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Featured Image</FormLabel>
@@ -690,7 +746,7 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
                                     variant="ghost"
                                     size="icon"
                                     onClick={() =>
-                                      form.setValue("postImg", "", {
+                                      form.setValue("post_img", "", {
                                         shouldDirty: true,
                                       })
                                     }
@@ -808,9 +864,9 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
                 </DropdownMenu>
               </div>
             </div>
-          </div>
-        </form>
-      </Form>
+          </form>
+        </Form>
+      </div>
     </div>
   );
 }

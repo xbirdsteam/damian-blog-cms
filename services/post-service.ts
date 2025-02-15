@@ -2,6 +2,7 @@
 
 import { createClient } from "@/utils/supabase/client";
 import { Section } from "@/types/editor";
+import { SEOConfig } from "@/services/seo-service";
 
 export interface Post {
     id?: string;

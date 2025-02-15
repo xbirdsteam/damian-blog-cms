@@ -2,18 +2,18 @@ import { seoService, SEOConfig } from "@/services/seo-service";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-export function useSEO(refId: string, slug: string) {
+export function useSEO(refId: string) {
     const queryClient = useQueryClient();
 
     const { data, isLoading } = useQuery({
-        queryKey: ['seo', refId, slug],
-        queryFn: () => seoService.getSEOConfig(refId, slug),
+        queryKey: ['seo', refId],
+        queryFn: () => seoService.getSEOConfig(refId),
     });
 
     const { mutateAsync: updateSEO, isPending: isUpdating } = useMutation({
         mutationFn: (config: Partial<SEOConfig>) => seoService.updateSEOConfig(config),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['seo', refId, slug] });
+            queryClient.invalidateQueries({ queryKey: ['seo', refId] });
             toast.success("SEO settings updated successfully");
         },
         onError: (error) => {
