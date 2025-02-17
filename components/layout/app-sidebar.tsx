@@ -12,7 +12,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { Briefcase, FileText, Home, Settings, User, MessageSquare } from "lucide-react";
+import { Briefcase, FileText, Home, Settings, User, MessageSquare, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import * as React from "react";
@@ -50,6 +50,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       url: "/cms/comments",
       icon: MessageSquare,
       isActive: pathname === "/cms/comments",
+    },
+    {
+      title: "Leads",
+      url: "/cms/leads",
+      icon: UserPlus,
+      isActive: pathname === "/cms/leads",
     },
     {
       title: "Consultancy",
