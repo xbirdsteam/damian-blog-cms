@@ -72,6 +72,13 @@ const formSchema = z.object({
   status: z.enum(["draft", "published"]),
   categoryIds: z.array(z.string()),
   content: z.any(), // This will store the sections
+  seo_config: z.object({
+    meta_title: z.string(),
+    meta_description: z.string(),
+    meta_keywords: z.string(),
+    og_image: z.string().optional(),
+    og_twitter_image: z.string().optional(),
+  }).optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -188,23 +195,38 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
           slug: values.slug,
           short_description: values.short_description,
           post_img: values.post_img || "",
-          content: sections, // Pass sections directly as array
+          content: sections,
           status,
           categoryIds: values.categoryIds,
           publish_date: isDraft ? null : new Date(),
         });
         toast.success(isDraft ? "Post updated successfully" : "Post published successfully");
       } else {
-        await createPost({
+        // Create post
+        const newPost = await createPost({
           title: values.title,
           slug: values.slug,
           short_description: values.short_description,
           post_img: values.post_img || "",
-          content: sections, // Pass sections directly as array
+          content: sections,
           status,
           categoryIds: values.categoryIds,
           publish_date: isDraft ? null : new Date(),
         });
+
+        // If SEO data was configured, create SEO config for the new post
+        if (values.seo_config) {
+          await updateSEO({
+            seo_ref_id: newPost.id,
+            meta_title: values.seo_config.meta_title,
+            meta_description: values.seo_config.meta_description,
+            meta_keywords: values.seo_config.meta_keywords,
+            og_image: values.seo_config.og_image,
+            og_twitter_image: values.seo_config.og_twitter_image,
+            slug: `gastronomy/${values.slug}`,
+          });
+        }
+
         toast.success(isDraft ? "Post created successfully" : "Post published successfully");
       }
     } catch (error) {
@@ -463,23 +485,31 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
 
   const handleSEOSubmit = async (seoValues: SeoFormValues) => {
     try {
-      if (!initialData?.id) {
-        toast.error("Please save the post first before configuring SEO");
+      if (mode === "create") {
+        // Store SEO values temporarily until post is created
+        form.setValue("seo_config", {
+          meta_title: seoValues.title,
+          meta_description: seoValues.description,
+          meta_keywords: seoValues.keywords,
+          og_image: seoValues.og_image,
+          og_twitter_image: seoValues.og_twitter_image,
+        });
+        toast.success("SEO settings will be saved after you publish or save draft the post");
         return;
       }
 
+      // For edit mode, update SEO directly
       const postSlug = form.getValues("slug");
 
       await updateSEO({
-        seo_ref_id: initialData.id,
+        seo_ref_id: initialData!.id,
         meta_title: seoValues.title,
         meta_description: seoValues.description,
         meta_keywords: seoValues.keywords,
         og_image: seoValues.og_image,
         og_twitter_image: seoValues.og_twitter_image,
-        slug: `gastronomy/${postSlug}`, // We still need this for the URL structure
+        slug: `gastronomy/${postSlug}`,
       });
-      toast.success("SEO settings updated successfully");
     } catch (error) {
       console.error(error);
       toast.error("Failed to update SEO settings");
@@ -520,7 +550,6 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
               onSubmit={handleSEOSubmit}
               onImageUpload={handleSEOImageUpload}
               isSaving={isUpdatingSEO}
-              disabled={mode === "create"}
             />
           </div>
         </div>

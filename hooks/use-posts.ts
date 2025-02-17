@@ -78,7 +78,6 @@ export function usePosts(options: UsePostsOptions = {}) {
             queryClient.invalidateQueries({
                 queryKey: ["posts-stats"]
             });
-            toast.success("Post updated successfully");
         },
         onError: (error) => {
             console.error("Error updating post:", error);
