@@ -119,7 +119,12 @@ export default function Posts() {
               ))}
             </>
           ) : posts.length > 0 ? (
-            posts.map((post) => <PostCard key={post.id} post={post} />)
+            posts.map((post) => (
+              <PostCard 
+                key={post.id} 
+                post={post}
+              />
+            ))
           ) : (
             <div className="col-span-full text-center py-10 text-muted-foreground">
               No posts found

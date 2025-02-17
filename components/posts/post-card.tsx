@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { LoadingImage } from "@/components/ui/loading-image";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { usePosts } from "@/hooks/use-posts";
@@ -26,11 +26,20 @@ import { toast } from "sonner";
 
 interface PostCardProps {
   post: Post;
+  href?: string;
+  onClickPost?: (postId: string) => void;
 }
 
-export function PostCard({ post }: PostCardProps) {
+export function PostCard({ post, href, onClickPost }: PostCardProps) {
   const { deletePost, isDeleting } = usePosts();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  const handleClick = (e: React.MouseEvent) => {
+    if (onClickPost) {
+      e.preventDefault();
+      onClickPost(post.id!);
+    }
+  };
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -49,76 +58,48 @@ export function PostCard({ post }: PostCardProps) {
   };
   return (
     <>
-      <Link href={`/cms/posts/${post.id}`}>
-        <Card
-          key={post.id}
-          className="group overflow-hidden border cursor-pointer relative flex flex-col min-h-[400px]"
-        >
-          {/* Featured Image */}
-          <div className="relative w-full aspect-video bg-muted border-b">
-            {post.post_img ? (
+      <Link 
+        href={href || `/cms/posts/${post.id}`}
+        onClick={handleClick}
+      >
+        <Card className="h-[400px] flex flex-col">
+          <CardContent className="flex-1 flex flex-col p-6">
+            <div className="relative aspect-[16/9] overflow-hidden rounded-md mb-4">
               <LoadingImage
-                src={post.post_img}
+                src={post.post_img || ""}
                 alt={post.title}
                 className="object-cover"
                 fill
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
               />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-muted/50">
-                <Eye className="h-8 w-8 text-muted-foreground/50" />
-              </div>
-            )}
-            <Badge
-              variant={post.status === "published" ? "default" : "secondary"}
-              className="absolute top-4 right-4 capitalize"
-            >
-              {post.status}
-            </Badge>
-          </div>
+            </div>
 
-          {/* Content */}
-          <div className="p-6 space-y-4 flex-1 flex flex-col">
-            <div className="space-y-2 flex-1">
-              <h3 className="font-semibold text-xl line-clamp-2 leading-tight min-h-[50px]">
+            <div className="flex-1 flex flex-col">
+              <h3 className="font-semibold leading-none tracking-tight mb-2 line-clamp-2">
                 {post.title}
               </h3>
-              <p className="text-sm text-muted-foreground line-clamp-2">
+              <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
                 {post.short_description}
               </p>
-            </div>
 
-            {/* Meta Information */}
-            <div className="space-y-3 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 flex-shrink-0" />
-                <span>
-                  {formatDistanceToNow(new Date(post.created_at), {
-                    addSuffix: true,
-                  })}
-                </span>
-              </div>
-
-              {post.posts_categories && post.posts_categories.length > 0 && (
-                <div className="flex items-start gap-2 pb-12">
-                  <Tag className="h-4 w-4 flex-shrink-0 mt-1" />
-                  <div className="flex flex-wrap gap-1">
-                    {post.posts_categories.map((pc) => (
-                      <Badge
-                        key={pc.categories.id}
-                        variant="outline"
-                        className="text-xs"
-                      >
-                        {pc.categories.name}
-                      </Badge>
-                    ))}
-                  </div>
+              <div className="mt-auto">
+                <div className="flex flex-wrap gap-2">
+                  {post.posts_categories?.map((pc) => (
+                    <Badge key={pc.categories.id} variant="secondary">
+                      {pc.categories.name}
+                    </Badge>
+                  ))}
                 </div>
-              )}
+                <div className="flex items-center gap-2 mt-4 text-sm text-muted-foreground">
+                  <Calendar className="h-4 w-4" />
+                  <span>
+                    {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                  </span>
+                </div>
+              </div>
             </div>
-          </div>
+          </CardContent>
 
-          {/* Delete Button */}
           <Button
             variant="ghost"
             size="sm"
