@@ -19,6 +19,9 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+  Label,
+} from "@/components/ui/label";
 import { LoadingImage } from "@/components/ui/loading-image";
 import {
   Select,
@@ -27,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { TagInput } from "@/components/ui/tag-input";
 import { Textarea } from "@/components/ui/textarea";
 import { useCategories } from "@/hooks/use-categories";
 import { usePosts } from "@/hooks/use-posts";
@@ -126,6 +130,11 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
     })) || []
   );
 
+  const [tags, setTags] = useState<string[]>(() => {
+    // Initialize with existing tags if editing a post
+    return initialData?.tags || [];
+  });
+
   // Initialize form with correct structure
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -199,6 +208,7 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
           status,
           categoryIds: values.categoryIds,
           publish_date: isDraft ? null : new Date(),
+          tags: tags,
         });
         toast.success(isDraft ? "Post updated successfully" : "Post published successfully");
       } else {
@@ -212,6 +222,7 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
           status,
           categoryIds: values.categoryIds,
           publish_date: isDraft ? null : new Date(),
+          tags: tags,
         });
 
         // If SEO data was configured, create SEO config for the new post
@@ -790,6 +801,19 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
                         </FormItem>
                       )}
                     />
+
+                    <div className="space-y-2">
+                      <Label>Tags</Label>
+                      <TagInput
+                        placeholder="Type a tag and press Enter..."
+                        tags={tags}
+                        setTags={setTags}
+                        disabled={isSaving}
+                      />
+                      <FormDescription>
+                        Type a tag and press Enter to add it to the list.
+                      </FormDescription>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

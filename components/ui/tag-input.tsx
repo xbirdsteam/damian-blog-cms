@@ -6,6 +6,7 @@ import * as React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { useRef } from "react";
 
 interface TagInputProps {
   placeholder?: string;
@@ -24,6 +25,7 @@ export function TagInput({
 }: TagInputProps) {
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const [inputValue, setInputValue] = React.useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const safeTags = Array.isArray(tags) ? tags : [];
 
@@ -37,6 +39,9 @@ export function TagInput({
     if (newTags.length > 0) {
       setTags([...safeTags, ...newTags]);
       setInputValue("");
+      if (inputRef.current) {
+        inputRef.current.value = "";
+      }
     }
   };
 

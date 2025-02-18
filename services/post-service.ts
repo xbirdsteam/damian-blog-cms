@@ -21,6 +21,8 @@ export interface Post {
     publish_date: Date | null;
     created_at: string;
     updated_at: string;
+    categoryIds: string[];
+    tags: string[];
 }
 
 export interface CreatePostOptions {
@@ -32,6 +34,7 @@ export interface CreatePostOptions {
     categoryIds: string[];
     content: Section[]; // This will store all sections
     publish_date: Date | null;
+    tags: string[];
 }
 
 export interface PostStats {
@@ -105,7 +108,7 @@ export const postService = {
         if (options.status) updates.status = options.status;
         if (options.content) updates.content = JSON.stringify(options.content);
         if (options.publish_date) updates.publish_date = options.publish_date;
-
+        if (options.tags) updates.tags = options.tags;
         // Get the post's created_at timestamp
         const { data: currentPost } = await supabase
             .from("posts")
@@ -161,6 +164,7 @@ export const postService = {
             created_at: now,
             updated_at: now,
             publish_date: options.publish_date,
+            tags: options.tags,
         }).select().single();
 
         if (error) throw error;
@@ -262,8 +266,8 @@ export const postService = {
             .from("posts")
             .select(`
                 *,
-                posts_categories (
-                    categories (
+                posts_categories(
+                    categories(
                         id,
                         name
                     )
@@ -274,8 +278,14 @@ export const postService = {
 
         if (error) throw error;
 
-        // No need to parse content here, return it as is
-        return data;
+        // Transform the data to match the Post interface
+        return {
+            ...data,
+            categoryIds: data.posts_categories.map(
+                (pc: any) => pc.categories.id
+            ),
+            tags: data.tags || [], // Ensure tags is always an array
+        };
     },
 
     async deletePost(id: string) {
