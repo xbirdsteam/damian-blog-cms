@@ -22,7 +22,6 @@ import { Input } from "@/components/ui/input";
 import { TagInput } from "@/components/ui/tag-input";
 import { Textarea } from "@/components/ui/textarea";
 import { useHomeSettings } from "@/hooks/use-home-settings";
-import type { PlateEditor as PlateEditorType } from "@udecode/plate-common/react";
 import { Loader2, Plus, Trash } from "lucide-react";
 import { useRef, useState } from "react";
 import { UseFormReturn } from "react-hook-form";
@@ -36,9 +35,6 @@ interface ContactSectionProps {
 export function ContactSection({ form }: ContactSectionProps) {
   const { data, isSaving, handleSectionUpdate } = useHomeSettings();
   const [updatingSection, setUpdatingSection] = useState<boolean>(false);
-
-  // Add editor ref
-  const editorRef = useRef<PlateEditorType | null>(null);
 
   // Add state for managing paragraphs
   const [paragraphs, setParagraphs] = useState<string[]>(() => {
