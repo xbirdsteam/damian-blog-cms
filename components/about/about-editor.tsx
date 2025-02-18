@@ -39,7 +39,7 @@ export function AboutEditor() {
     seoConfig,
     updateSEO,
     isUpdating: isUpdatingSEO,
-  } = useSEO(seoRefId, "about");
+  } = useSEO(seoRefId);
 
   const handleUpdateTitle = async (newTitle: string) => {
     await updateData({

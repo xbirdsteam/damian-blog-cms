@@ -52,7 +52,7 @@ export function ConsultancyEditor() {
     seoConfig,
     updateSEO,
     isUpdating: isUpdatingSEO,
-  } = useSEO(seoRefId, "consultancy");
+  } = useSEO(seoRefId);
 
   useEffect(() => {
     if (content) {

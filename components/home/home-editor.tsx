@@ -30,7 +30,7 @@ export function HomeEditor() {
     seoConfig,
     updateSEO,
     isUpdating: isUpdatingSEO,
-  } = useSEO(seoRefId, "home");
+  } = useSEO(seoRefId);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
