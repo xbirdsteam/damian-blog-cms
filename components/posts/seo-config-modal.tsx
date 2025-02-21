@@ -29,10 +29,12 @@ import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 
 const seoSchema = z.object({
-  title: z.string()
+  title: z
+    .string()
     .min(1, "Title is required")
     .max(100, "Title should be less than 100 characters"),
-  description: z.string()
+  description: z
+    .string()
     .min(1, "Description is required")
     .max(300, "Description should be less than 300 characters"),
   keywords: z.string().min(1, "Keywords are required"),
@@ -124,11 +126,18 @@ export function PostSEOConfigModal({
       let ogImage = values.og_image;
       let ogTwitterImage = values.og_twitter_image;
 
+      const uploadTasks: Promise<string>[] = [];
       if (imageFile) {
-        ogImage = await onImageUpload(imageFile, "default");
+        uploadTasks.push(onImageUpload(imageFile, "default"));
       }
       if (twitterImageFile) {
-        ogTwitterImage = await onImageUpload(twitterImageFile, "twitter");
+        uploadTasks.push(onImageUpload(twitterImageFile, "twitter"));
+      }
+
+      if (uploadTasks.length > 0) {
+        const results = await Promise.all(uploadTasks);
+        if (imageFile) ogImage = results[0];
+        if (twitterImageFile) ogTwitterImage = results[uploadTasks.length - 1];
       }
 
       await onSubmit({
@@ -140,9 +149,9 @@ export function PostSEOConfigModal({
       // Cleanup previews
       if (imagePreview) URL.revokeObjectURL(imagePreview);
       if (twitterImagePreview) URL.revokeObjectURL(twitterImagePreview);
-      setImagePreview("");
+      setImagePreview(ogImage || "");
       setImageFile(null);
-      setTwitterImagePreview("");
+      setTwitterImagePreview(ogTwitterImage || "");
       setTwitterImageFile(null);
     } catch (error) {
       console.error("Error in SEO submit:", error);
@@ -166,12 +175,16 @@ export function PostSEOConfigModal({
         <DialogHeader>
           <DialogTitle>SEO Settings</DialogTitle>
           <DialogDescription>
-            Configure SEO settings for better visibility in search engines and social media.
+            Configure SEO settings for better visibility in search engines and
+            social media.
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+          <form
+            onSubmit={form.handleSubmit(handleSubmit)}
+            className="space-y-6"
+          >
             <FormField
               control={form.control}
               name="title"
@@ -181,11 +194,15 @@ export function PostSEOConfigModal({
                   <FormControl>
                     <Input {...field} disabled={isSaving} />
                   </FormControl>
-                  <FormDescription className={cn(
-                    titleLength > 0 && titleLength < 50 && "text-yellow-500",
-                    titleLength >= 50 && titleLength <= 60 && "text-green-500",
-                    titleLength > 60 && "text-red-500"
-                  )}>
+                  <FormDescription
+                    className={cn(
+                      titleLength > 0 && titleLength < 50 && "text-yellow-500",
+                      titleLength >= 50 &&
+                        titleLength <= 60 &&
+                        "text-green-500",
+                      titleLength > 60 && "text-red-500"
+                    )}
+                  >
                     {titleLength}/60 characters (50-60 characters recommended)
                   </FormDescription>
                   <FormMessage />
@@ -202,12 +219,19 @@ export function PostSEOConfigModal({
                   <FormControl>
                     <Textarea {...field} disabled={isSaving} />
                   </FormControl>
-                  <FormDescription className={cn(
-                    descriptionLength > 0 && descriptionLength < 150 && "text-yellow-500",
-                    descriptionLength >= 150 && descriptionLength <= 160 && "text-green-500",
-                    descriptionLength > 160 && "text-red-500"
-                  )}>
-                    {descriptionLength}/160 characters (150-160 characters recommended)
+                  <FormDescription
+                    className={cn(
+                      descriptionLength > 0 &&
+                        descriptionLength < 150 &&
+                        "text-yellow-500",
+                      descriptionLength >= 150 &&
+                        descriptionLength <= 160 &&
+                        "text-green-500",
+                      descriptionLength > 160 && "text-red-500"
+                    )}
+                  >
+                    {descriptionLength}/160 characters (150-160 characters
+                    recommended)
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -272,7 +296,8 @@ export function PostSEOConfigModal({
                     </div>
                   </FormControl>
                   <FormDescription>
-                    Recommended size: 1200x630 pixels. This image will be shown when your post is shared on social media.
+                    Recommended size: 1200x630 pixels. This image will be shown
+                    when your post is shared on social media.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -309,7 +334,9 @@ export function PostSEOConfigModal({
                           type="button"
                           variant="outline"
                           onClick={() =>
-                            document.getElementById("og-twitter-image-upload")?.click()
+                            document
+                              .getElementById("og-twitter-image-upload")
+                              ?.click()
                           }
                           disabled={isSaving}
                         >
@@ -320,7 +347,9 @@ export function PostSEOConfigModal({
                     </div>
                   </FormControl>
                   <FormDescription>
-                    Recommended size: 1200x630 pixels. While Twitter supports various card sizes, using 1200x630 ensures consistency across all social platforms.
+                    Recommended size: 1200x630 pixels. While Twitter supports
+                    various card sizes, using 1200x630 ensures consistency
+                    across all social platforms.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -328,14 +357,13 @@ export function PostSEOConfigModal({
             />
 
             <div className="flex justify-end pt-4">
-              <Button 
-                type="submit" 
-                disabled={isSaving || isUploadingImages}
-              >
-                {(isSaving || isUploadingImages) ? (
+              <Button type="submit" disabled={isSaving || isUploadingImages}>
+                {isSaving || isUploadingImages ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {isUploadingImages ? "Uploading Images..." : "Saving Changes..."}
+                    {isUploadingImages
+                      ? "Uploading Images..."
+                      : "Saving Changes..."}
                   </>
                 ) : (
                   "Save SEO Settings"
@@ -347,4 +375,4 @@ export function PostSEOConfigModal({
       </DialogContent>
     </Dialog>
   );
-} 
+}

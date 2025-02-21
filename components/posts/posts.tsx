@@ -28,6 +28,8 @@ export default function Posts() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [isSearching, setIsSearching] = useState(false);
+  const [isFiltering, setIsFiltering] = useState(false);
 
   const debouncedSearch = useDebounce(searchQuery, 300);
 
@@ -42,12 +44,32 @@ export default function Posts() {
 
   const filteredPosts = useMemo(() => {
     if (statusFilter === "all") return posts;
-    return posts.filter(post => post.status === statusFilter);
+    return posts.filter((post) => post.status === statusFilter);
   }, [posts, statusFilter]);
 
   useEffect(() => {
     setCurrentPage(1);
   }, [debouncedSearch, selectedCategories, statusFilter]);
+
+  useEffect(() => {
+    if (searchQuery) {
+      setIsSearching(true);
+      const timer = setTimeout(() => {
+        setIsSearching(false);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (selectedCategories.length > 0 || statusFilter !== "all") {
+      setIsFiltering(true);
+      const timer = setTimeout(() => {
+        setIsFiltering(false);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedCategories, statusFilter]);
 
   const handlePreviousPage = () => {
     setCurrentPage((prev) => Math.max(prev - 1, 1));
@@ -83,53 +105,77 @@ export default function Posts() {
         </div>
 
         <div className="flex items-center gap-4">
-          <Input
-            placeholder="Search posts..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="max-w-sm"
-          />
-          <div className="flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="w-[180px] justify-between">
-                  {selectedCategories.length > 0 
-                    ? `${selectedCategories.length} categories`
-                    : "Categories"}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-[200px]">
-                <DropdownMenuLabel>Filter by category</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {categories.map((category) => (
-                  <DropdownMenuCheckboxItem
-                    key={category.id}
-                    checked={selectedCategories.includes(category.id)}
-                    onCheckedChange={(checked) => {
-                      setSelectedCategories((current) => {
-                        if (checked) {
-                          return [...current, category.id];
-                        }
-                        return current.filter((id) => id !== category.id);
-                      });
-                    }}
-                  >
-                    {category.name}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <PostsFilter 
-              status={statusFilter} 
-              onStatusChange={setStatusFilter} 
-            />
+          <div className="flex-1">
+            <div className="relative">
+              <Input
+                placeholder="Search posts..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-[300px]"
+                disabled={isLoading}
+              />
+              {isSearching && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                </div>
+              )}
+            </div>
           </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="ml-auto"
+                disabled={isLoading}
+              >
+                {isFiltering ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Filtering...
+                  </>
+                ) : (
+                  <>
+                    Categories
+                    <ChevronsUpDown className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[200px]">
+              <DropdownMenuLabel>Filter by category</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {categories.map((category) => (
+                <DropdownMenuCheckboxItem
+                  key={category.id}
+                  checked={selectedCategories.includes(category.id)}
+                  onCheckedChange={(checked) => {
+                    setSelectedCategories((current) => {
+                      if (checked) {
+                        return [...current, category.id];
+                      }
+                      return current.filter((id) => id !== category.id);
+                    });
+                  }}
+                >
+                  {category.name}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <PostsFilter
+            status={statusFilter}
+            onStatusChange={setStatusFilter}
+            isLoading={isFiltering}
+          />
         </div>
 
         <div className="space-y-4">
-          <PostsTable posts={filteredPosts} />
+          <PostsTable
+            posts={filteredPosts}
+            isLoading={isSearching || isFiltering}
+          />
           {pagination.totalPages > 1 && (
             <div className="flex items-center justify-between">
               <div className="text-sm text-muted-foreground">

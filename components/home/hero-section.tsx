@@ -15,8 +15,7 @@ import { FormControl, FormField, FormItem } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { LoadingImage } from "@/components/ui/loading-image";
 import { useHomeSettings } from "@/hooks/use-home-settings";
-import { homeService, uploadHomeImage } from "@/services/home-service";
-import { addCacheBuster } from "@/utils/url-helpers";
+import { deleteFile, getPathFromUrl, uploadImage } from "@/services";
 import { Loader2, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { UseFormReturn } from "react-hook-form";
@@ -28,16 +27,15 @@ interface HeroSectionProps {
 }
 
 export function HeroSection({ form }: HeroSectionProps) {
-  const { data, isSaving, handleImageUpdate } = useHomeSettings();
+  const { data, handleSectionUpdate } = useHomeSettings();
   const [desktopFile, setDesktopFile] = useState<File | null>(null);
   const [mobileFile, setMobileFile] = useState<File | null>(null);
   const [previewImage, setPreviewImage] = useState<{
     desktop?: string;
     mobile?: string;
   }>({});
-  const [uploadingType, setUploadingType] = useState<
-    "desktop" | "mobile" | null
-  >(null);
+  const [updatingDesktop, setUpdatingDesktop] = useState(false);
+  const [updatingMobile, setUpdatingMobile] = useState(false);
 
   const handleImageSelect = (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -63,59 +61,83 @@ export function HeroSection({ form }: HeroSectionProps) {
     }
   };
 
-  const handleUpload = async (type: "desktop" | "mobile") => {
-    try {
-      setUploadingType(type);
-      let currentId = data?.id;
+  const handleDesktopImageUpdate = async () => {
+    if (!desktopFile) return;
 
-      if (!currentId) {
-        const newData = await homeService.createHomeSettings();
-        currentId = newData.id;
-        form.reset(newData);
+    try {
+      setUpdatingDesktop(true);
+      const currentImageUrl = data?.hero_desktop_img_url;
+      const uploadTasks: Promise<string | boolean>[] = [];
+
+      if (currentImageUrl) {
+        const path = getPathFromUrl(currentImageUrl, "images");
+        if (path) {
+          uploadTasks.push(deleteFile(path, "images"));
+        }
       }
 
-      const file = type === "desktop" ? desktopFile : mobileFile;
-      if (!file) return;
+      uploadTasks.push(uploadImage(desktopFile, "hero/desktop"));
 
-      const url = await uploadHomeImage({
-        file,
-        path: `hero/${type}`,
+      const results = await Promise.all(uploadTasks);
+      const imageUrl = results[results.length - 1] as string;
+
+      await handleSectionUpdate(data?.id || "", "hero", {
+        hero_desktop_img_url: imageUrl,
       });
 
-      await handleImageUpdate(currentId, type, url);
-
-      if (previewImage[type]) {
-        URL.revokeObjectURL(previewImage[type]!);
+      if (previewImage.desktop) {
+        URL.revokeObjectURL(previewImage.desktop);
       }
+      setPreviewImage((prev) => ({ ...prev, desktop: imageUrl }));
+      setDesktopFile(null);
+      form.setValue("hero.background.desktop", imageUrl);
 
-      if (type === "desktop") {
-        setDesktopFile(null);
-      } else {
-        setMobileFile(null);
-      }
-
-      setPreviewImage((prev) => ({
-        ...prev,
-        [type]: undefined,
-      }));
-
-      const finalUrl = addCacheBuster(url);
-      form.setValue(`hero.background.${type}`, finalUrl);
-
-      toast.success(
-        `${
-          type === "desktop" ? "Desktop" : "Mobile"
-        } background updated successfully`
-      );
+      toast.success("Desktop background updated successfully");
     } catch (error) {
-      console.error(`Error in upload (${type}):`, error);
-      toast.error(
-        `Failed to update ${
-          type === "desktop" ? "desktop" : "mobile"
-        } background`
-      );
+      console.error("Error uploading desktop background:", error);
+      toast.error("Failed to update desktop background");
     } finally {
-      setUploadingType(null);
+      setUpdatingDesktop(false);
+    }
+  };
+
+  const handleMobileImageUpdate = async () => {
+    if (!mobileFile) return;
+
+    try {
+      setUpdatingMobile(true);
+      const currentImageUrl = data?.hero_mobile_img_url;
+      const uploadTasks: Promise<string | boolean>[] = [];
+
+      if (currentImageUrl) {
+        const path = getPathFromUrl(currentImageUrl, "images");
+        if (path) {
+          uploadTasks.push(deleteFile(path, "images"));
+        }
+      }
+
+      uploadTasks.push(uploadImage(mobileFile, "hero/mobile"));
+
+      const results = await Promise.all(uploadTasks);
+      const imageUrl = results[results.length - 1] as string;
+
+      await handleSectionUpdate(data?.id || "", "hero", {
+        hero_mobile_img_url: imageUrl,
+      });
+
+      if (previewImage.mobile) {
+        URL.revokeObjectURL(previewImage.mobile);
+      }
+      setPreviewImage((prev) => ({ ...prev, mobile: imageUrl }));
+      setMobileFile(null);
+      form.setValue("hero.background.mobile", imageUrl);
+
+      toast.success("Mobile background updated successfully");
+    } catch (error) {
+      console.error("Error uploading mobile background:", error);
+      toast.error("Failed to update mobile background");
+    } finally {
+      setUpdatingMobile(false);
     }
   };
 
@@ -143,7 +165,6 @@ export function HeroSection({ form }: HeroSectionProps) {
         <Card>
           <CardHeader>
             <CardTitle>Desktop Background</CardTitle>
-            <CardDescription>Recommended size: 1920x1080px</CardDescription>
           </CardHeader>
           <CardContent>
             <FormField
@@ -157,8 +178,7 @@ export function HeroSection({ form }: HeroSectionProps) {
                         <div className="relative aspect-[21/9] w-full overflow-hidden rounded-lg border">
                           <LoadingImage
                             src={
-                              previewImage.desktop ||
-                              addCacheBuster(data?.hero_desktop_img_url)
+                              previewImage.desktop || data?.hero_desktop_img_url
                             }
                             alt="Desktop Background Preview"
                             className="object-cover"
@@ -183,7 +203,7 @@ export function HeroSection({ form }: HeroSectionProps) {
                               .getElementById("hero-desktop-bg-upload")
                               ?.click()
                           }
-                          disabled={isSaving}
+                          disabled={updatingDesktop}
                         >
                           <Upload className="mr-2 h-4 w-4" />
                           {data?.hero_desktop_img_url
@@ -191,23 +211,37 @@ export function HeroSection({ form }: HeroSectionProps) {
                             : "Choose Desktop Background"}
                         </Button>
                         {desktopFile && (
-                          <Button
-                            type="button"
-                            onClick={() => handleUpload("desktop")}
-                            disabled={isSaving || uploadingType === "desktop"}
-                          >
-                            {uploadingType === "desktop" ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Uploading...
-                              </>
-                            ) : (
-                              <>
-                                <Upload className="mr-2 h-4 w-4" />
-                                Upload
-                              </>
-                            )}
-                          </Button>
+                          <>
+                            <Button
+                              onClick={handleDesktopImageUpdate}
+                              disabled={updatingDesktop}
+                            >
+                              {updatingDesktop ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Uploading...
+                                </>
+                              ) : (
+                                "Update Background"
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              onClick={() => {
+                                setDesktopFile(null);
+                                if (previewImage.desktop) {
+                                  URL.revokeObjectURL(previewImage.desktop);
+                                }
+                                setPreviewImage((prev) => ({
+                                  ...prev,
+                                  desktop: undefined,
+                                }));
+                              }}
+                              disabled={updatingDesktop}
+                            >
+                              Cancel
+                            </Button>
+                          </>
                         )}
                       </div>
                     </div>
@@ -222,7 +256,6 @@ export function HeroSection({ form }: HeroSectionProps) {
         <Card>
           <CardHeader>
             <CardTitle>Mobile Background</CardTitle>
-            <CardDescription>Recommended size: 750x1334px</CardDescription>
           </CardHeader>
           <CardContent>
             <FormField
@@ -236,8 +269,7 @@ export function HeroSection({ form }: HeroSectionProps) {
                         <div className="relative aspect-[21/9] w-full overflow-hidden rounded-lg border">
                           <LoadingImage
                             src={
-                              previewImage.mobile ||
-                              addCacheBuster(data?.hero_mobile_img_url)
+                              previewImage.mobile || data?.hero_mobile_img_url
                             }
                             alt="Mobile Background Preview"
                             fill
@@ -262,7 +294,7 @@ export function HeroSection({ form }: HeroSectionProps) {
                               .getElementById("hero-mobile-bg-upload")
                               ?.click()
                           }
-                          disabled={isSaving}
+                          disabled={updatingMobile}
                         >
                           <Upload className="mr-2 h-4 w-4" />
                           {data?.hero_mobile_img_url
@@ -270,23 +302,37 @@ export function HeroSection({ form }: HeroSectionProps) {
                             : "Choose Mobile Background"}
                         </Button>
                         {mobileFile && (
-                          <Button
-                            type="button"
-                            onClick={() => handleUpload("mobile")}
-                            disabled={isSaving || uploadingType === "mobile"}
-                          >
-                            {uploadingType === "mobile" ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Uploading...
-                              </>
-                            ) : (
-                              <>
-                                <Upload className="mr-2 h-4 w-4" />
-                                Upload
-                              </>
-                            )}
-                          </Button>
+                          <>
+                            <Button
+                              onClick={handleMobileImageUpdate}
+                              disabled={updatingMobile}
+                            >
+                              {updatingMobile ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Uploading...
+                                </>
+                              ) : (
+                                "Update Background"
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              onClick={() => {
+                                setMobileFile(null);
+                                if (previewImage.mobile) {
+                                  URL.revokeObjectURL(previewImage.mobile);
+                                }
+                                setPreviewImage((prev) => ({
+                                  ...prev,
+                                  mobile: undefined,
+                                }));
+                              }}
+                              disabled={updatingMobile}
+                            >
+                              Cancel
+                            </Button>
+                          </>
                         )}
                       </div>
                     </div>

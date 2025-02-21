@@ -19,9 +19,10 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useSettings } from "@/hooks/use-settings";
+import { deleteFile, getPathFromUrl, uploadImage } from "@/services";
 import { UpdateLayoutOptions } from "@/services/settings-service";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ImageIcon, Loader2, Trash2 } from "lucide-react";
+import { ImageIcon, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -46,113 +47,18 @@ interface IProps {
   id: string;
 }
 
-function LogoUploadCard({
-  title,
-  description,
-  logoUrl,
-  isUploading,
-  onUpload,
-  onRemove,
-  type,
-}: {
-  title: string;
-  description: string;
-  logoUrl: string | null;
-  isUploading: boolean;
-  onUpload: (file: File) => void;
-  onRemove: () => void;
-  type: "header" | "footer";
-}) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-col gap-6">
-          {/* Logo Preview Area */}
-          <div className="relative group">
-            {logoUrl ? (
-              <div className="relative aspect-[3/1] rounded-lg overflow-hidden bg-muted/30 flex items-center justify-center border">
-                <img
-                  src={logoUrl}
-                  alt={`${type} Logo`}
-                  className="max-h-24 w-auto object-contain"
-                />
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() =>
-                      document.getElementById(`${type}-logo`)?.click()
-                    }
-                  >
-                    <ImageIcon className="mr-2 h-4 w-4" />
-                    Change
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    onClick={onRemove}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Remove
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div
-                className="aspect-[3/1] rounded-lg border-2 border-dashed flex flex-col items-center justify-center gap-4 hover:border-primary/50 transition-colors cursor-pointer"
-                onClick={() => document.getElementById(`${type}-logo`)?.click()}
-              >
-                <div className="rounded-full bg-muted/30 p-4">
-                  <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-medium">Click to upload logo</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    SVG, PNG, JPG or GIF (Max. 2MB)
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Hidden File Input */}
-          <input
-            type="file"
-            id={`${type}-logo`}
-            className="hidden"
-            accept="image/*"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) onUpload(file);
-            }}
-          />
-
-          {/* Upload Progress */}
-          {isUploading && (
-            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-              <div className="bg-primary h-full w-full animate-pulse" />
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 export function LayoutSettings({ id }: IProps) {
-  const { data, updateLayout, isSavingLayout, uploadLogo } = useSettings();
-  const [isUploadingHeaderLogo, setIsUploadingHeaderLogo] = useState(false);
-  const [isUploadingFooterLogo, setIsUploadingFooterLogo] = useState(false);
-
+  const { data, updateLayout, isSavingLayout } = useSettings();
   // Initialize with data if available
   const [headerLogo, setHeaderLogo] = useState<string | null>(null);
   const [footerLogo, setFooterLogo] = useState<string | null>(null);
+
+  const [headerImageFile, setHeaderImageFile] = useState<File | null>(null);
+  const [headerImagePreview, setHeaderImagePreview] = useState<string>("");
+  const [footerImageFile, setFooterImageFile] = useState<File | null>(null);
+  const [footerImagePreview, setFooterImagePreview] = useState<string>("");
+  const [updatingHeaderImage, setUpdatingHeaderImage] = useState(false);
+  const [updatingFooterImage, setUpdatingFooterImage] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -201,82 +107,262 @@ export function LayoutSettings({ id }: IProps) {
     await updateLayout(updateOptions);
   };
 
-  const handleLogoUpload = async (file: File, type: "header" | "footer") => {
-    const setLoading =
-      type === "header" ? setIsUploadingHeaderLogo : setIsUploadingFooterLogo;
-    const setLogo = type === "header" ? setHeaderLogo : setFooterLogo;
-    const otherLogo = type === "header" ? footerLogo : headerLogo;
+  const handleHeaderImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (headerImagePreview) {
+      URL.revokeObjectURL(headerImagePreview);
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    setHeaderImagePreview(previewUrl);
+    setHeaderImageFile(file);
+  };
+
+  const handleFooterImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (footerImagePreview) {
+      URL.revokeObjectURL(footerImagePreview);
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    setFooterImagePreview(previewUrl);
+    setFooterImageFile(file);
+  };
+
+  const handleHeaderImageUpdate = async () => {
+    if (!headerImageFile) return;
 
     try {
-      setLoading(true);
-      const url = await uploadLogo({ file, type });
-      setLogo(url);
+      setUpdatingHeaderImage(true);
+      const currentImageUrl = data?.header_logo;
+      const uploadTasks: Promise<string | boolean>[] = [];
+
+      if (currentImageUrl) {
+        const path = getPathFromUrl(currentImageUrl, "images");
+        if (path) {
+          uploadTasks.push(deleteFile(path, "images"));
+        }
+      }
+
+      uploadTasks.push(uploadImage(headerImageFile, "layout/header-logo"));
+
+      const results = await Promise.all(uploadTasks);
+      const imageUrl = results[results.length - 1] as string;
+
       await updateLayout({
-        id,
-        header_logo: type === "header" ? url : otherLogo,
-        footer_logo: type === "footer" ? url : otherLogo,
+        id: id || uuidv4(),
+        header_logo: imageUrl,
       });
+
+      if (headerImagePreview) {
+        URL.revokeObjectURL(headerImagePreview);
+      }
+      setHeaderImagePreview(imageUrl);
+      setHeaderImageFile(null);
+      toast.success("Header logo updated successfully");
     } catch (error) {
-      console.error(`Error uploading ${type} logo:`, error);
-      toast.error(`Failed to upload ${type} logo`);
+      console.error("Error uploading header logo:", error);
+      toast.error("Failed to update header logo");
     } finally {
-      setLoading(false);
+      setUpdatingHeaderImage(false);
     }
   };
 
-  const handleRemoveHeaderLogo = async () => {
-    try {
-      setHeaderLogo(null);
-      await updateLayout({
-        id,
-        header_logo: null,
-        footer_logo: footerLogo,
-      });
-      toast.success("Header logo removed successfully");
-    } catch (error) {
-      console.error("Error removing header logo:", error);
-      toast.error("Failed to remove header logo");
-    }
-  };
+  const handleFooterImageUpdate = async () => {
+    if (!footerImageFile) return;
 
-  const handleRemoveFooterLogo = async () => {
     try {
-      setFooterLogo(null);
+      setUpdatingFooterImage(true);
+      const currentImageUrl = data?.footer_logo;
+      const uploadTasks: Promise<string | boolean>[] = [];
+
+      if (currentImageUrl) {
+        const path = getPathFromUrl(currentImageUrl, "images");
+        if (path) {
+          uploadTasks.push(deleteFile(path, "images"));
+        }
+      }
+
+      uploadTasks.push(uploadImage(footerImageFile, "layout/footer-logo"));
+
+      const results = await Promise.all(uploadTasks);
+      const imageUrl = results[results.length - 1] as string;
+
       await updateLayout({
-        id,
-        header_logo: headerLogo,
-        footer_logo: null,
+        id: id || uuidv4(),
+        footer_logo: imageUrl,
       });
-      toast.success("Footer logo removed successfully");
+
+      if (footerImagePreview) {
+        URL.revokeObjectURL(footerImagePreview);
+      }
+      setFooterImagePreview(imageUrl);
+      setFooterImageFile(null);
+      toast.success("Footer logo updated successfully");
     } catch (error) {
-      console.error("Error removing footer logo:", error);
-      toast.error("Failed to remove footer logo");
+      console.error("Error uploading footer logo:", error);
+      toast.error("Failed to update footer logo");
+    } finally {
+      setUpdatingFooterImage(false);
     }
   };
 
   return (
     <div className="space-y-6">
-      {/* Header Logo */}
-      <LogoUploadCard
-        title="Header Logo"
-        description="Upload your website header logo"
-        logoUrl={headerLogo}
-        isUploading={isUploadingHeaderLogo}
-        onUpload={(file) => handleLogoUpload(file, "header")}
-        onRemove={handleRemoveHeaderLogo}
-        type="header"
-      />
+      {/* Logo Cards Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Header Logo Card */}
+        <Card>
+          <CardHeader className="space-y-2">
+            <CardTitle className="text-lg">Header Logo</CardTitle>
+            <CardDescription>Upload your website header logo</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {(headerImagePreview || data?.header_logo) && (
+                <div className="relative aspect-[3/1] w-full max-w-md overflow-hidden rounded-lg border">
+                  <img
+                    src={headerImagePreview || data?.header_logo || ""}
+                    alt="Header Logo"
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleHeaderImageSelect}
+                  className="hidden"
+                  id="header-logo-upload"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    document.getElementById("header-logo-upload")?.click()
+                  }
+                  disabled={updatingHeaderImage}
+                >
+                  <ImageIcon className="mr-2 h-4 w-4" />
+                  {data?.header_logo ? "Change Logo" : "Upload Logo"}
+                </Button>
+                {headerImageFile && (
+                  <>
+                    <Button
+                      size="sm"
+                      onClick={handleHeaderImageUpdate}
+                      disabled={updatingHeaderImage}
+                    >
+                      {updatingHeaderImage ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        "Update Logo"
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setHeaderImageFile(null);
+                        if (headerImagePreview) {
+                          URL.revokeObjectURL(headerImagePreview);
+                        }
+                        setHeaderImagePreview("");
+                      }}
+                      disabled={updatingHeaderImage}
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Footer Logo */}
-      <LogoUploadCard
-        title="Footer Logo"
-        description="Upload your website footer logo"
-        logoUrl={footerLogo}
-        isUploading={isUploadingFooterLogo}
-        onUpload={(file) => handleLogoUpload(file, "footer")}
-        onRemove={handleRemoveFooterLogo}
-        type="footer"
-      />
+        {/* Footer Logo Card */}
+        <Card>
+          <CardHeader className="space-y-2">
+            <CardTitle className="text-lg">Footer Logo</CardTitle>
+            <CardDescription>Upload your website footer logo</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {(footerImagePreview || data?.footer_logo) && (
+                <div className="relative aspect-[3/1] w-full max-w-md overflow-hidden rounded-lg border">
+                  <img
+                    src={footerImagePreview || data?.footer_logo || ""}
+                    alt="Footer Logo"
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFooterImageSelect}
+                  className="hidden"
+                  id="footer-logo-upload"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    document.getElementById("footer-logo-upload")?.click()
+                  }
+                  disabled={updatingFooterImage}
+                >
+                  <ImageIcon className="mr-2 h-4 w-4" />
+                  {data?.footer_logo ? "Change Logo" : "Upload Logo"}
+                </Button>
+                {footerImageFile && (
+                  <>
+                    <Button
+                      size="sm"
+                      onClick={handleFooterImageUpdate}
+                      disabled={updatingFooterImage}
+                    >
+                      {updatingFooterImage ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        "Update Logo"
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setFooterImageFile(null);
+                        if (footerImagePreview) {
+                          URL.revokeObjectURL(footerImagePreview);
+                        }
+                        setFooterImagePreview("");
+                      }}
+                      disabled={updatingFooterImage}
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">

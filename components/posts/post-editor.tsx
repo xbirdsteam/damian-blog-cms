@@ -19,9 +19,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  Label,
-} from "@/components/ui/label";
+import { Label } from "@/components/ui/label";
 import { LoadingImage } from "@/components/ui/loading-image";
 import {
   Select,
@@ -75,13 +73,15 @@ const formSchema = z.object({
   status: z.enum(["draft", "published"]),
   categoryIds: z.array(z.string()),
   content: z.any(), // This will store the sections
-  seo_config: z.object({
-    meta_title: z.string(),
-    meta_description: z.string(),
-    meta_keywords: z.string(),
-    og_image: z.string().optional(),
-    og_twitter_image: z.string().optional(),
-  }).optional(),
+  seo_config: z
+    .object({
+      meta_title: z.string(),
+      meta_description: z.string(),
+      meta_keywords: z.string(),
+      og_image: z.string().optional(),
+      og_twitter_image: z.string().optional(),
+    })
+    .optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -143,7 +143,8 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
       short_description: initialData?.short_description || "",
       post_img: initialData?.post_img || "",
       status: initialData?.status || "draft",
-      categoryIds: initialData?.posts_categories?.map((pc) => pc.categories.id) || [],
+      categoryIds:
+        initialData?.posts_categories?.map((pc) => pc.categories.id) || [],
       content: initialData?.content || "",
     },
   });
@@ -158,7 +159,8 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
         short_description: initialData.short_description || "",
         post_img: initialData.post_img || "",
         status: initialData.status || "draft",
-        categoryIds: initialData?.posts_categories?.map((pc) => pc.categories.id) || [],
+        categoryIds:
+          initialData?.posts_categories?.map((pc) => pc.categories.id) || [],
         content: initialData.content || "",
       });
 
@@ -190,7 +192,7 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
         }
       }
     });
-    
+
     return () => subscription.unsubscribe();
   }, [form, initialData?.id]);
 
@@ -213,12 +215,18 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
           publish_date: isDraft ? null : new Date(),
           tags: tags,
         });
-        toast.success(isDraft ? "Post updated successfully (Draft)" : "Post published successfully");
+        toast.success(
+          isDraft
+            ? "Post updated successfully (Draft)"
+            : "Post published successfully"
+        );
       } else {
         // Only get user for new post creation
         const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+
         if (!user) {
           throw new Error("Not authenticated");
         }
@@ -250,7 +258,11 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
           });
         }
 
-        toast.success(isDraft ? "Post created successfully (Draft)" : "Post published successfully");
+        toast.success(
+          isDraft
+            ? "Post created successfully (Draft)"
+            : "Post published successfully"
+        );
       }
     } catch (error) {
       console.error(error);
@@ -348,15 +360,6 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
           type: "list",
           title: "",
           lists: [{ title: "", items: [""] }],
-        };
-        break;
-
-      case "post-author":
-        newSection = {
-          id: nanoid(),
-          type: "post-author",
-          author_name: "",
-          avatar_url: null,
         };
         break;
 
@@ -502,7 +505,7 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
   const {
     seoConfig,
     updateSEO,
-    isUpdating: isUpdatingSEO
+    isUpdating: isUpdatingSEO,
   } = useSEO(initialData?.id || "");
 
   const handleSEOSubmit = async (seoValues: SeoFormValues) => {
@@ -516,7 +519,9 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
           og_image: seoValues.og_image,
           og_twitter_image: seoValues.og_twitter_image,
         });
-        toast.success("SEO settings will be saved after you publish or save draft the post");
+        toast.success(
+          "SEO settings will be saved after you publish or save draft the post"
+        );
         return;
       }
 
@@ -538,7 +543,10 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
     }
   };
 
-  const handleSEOImageUpload = async (file: File, type: "default" | "twitter") => {
+  const handleSEOImageUpload = async (
+    file: File,
+    type: "default" | "twitter"
+  ) => {
     try {
       const url = await uploadService.uploadImage(file);
       return url;
@@ -591,7 +599,9 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
                         type="button"
                         variant="outline"
                         disabled={isSaving}
-                        onClick={() => form.handleSubmit((data) => onSubmit(data, true))()}
+                        onClick={() =>
+                          form.handleSubmit((data) => onSubmit(data, true))()
+                        }
                         className="cursor-pointer"
                       >
                         {isSaving && !isPublishing ? (
@@ -609,7 +619,9 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
                       <Button
                         type="button"
                         disabled={isSaving}
-                        onClick={() => form.handleSubmit((data) => onSubmit(data, false))()}
+                        onClick={() =>
+                          form.handleSubmit((data) => onSubmit(data, false))()
+                        }
                         className="cursor-pointer"
                       >
                         {isPublishing ? (

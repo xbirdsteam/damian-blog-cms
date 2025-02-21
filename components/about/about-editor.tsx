@@ -26,8 +26,7 @@ import { EditDialog } from "./edit-dialog";
 import { TimelineDialog } from "./timeline-dialog";
 
 export function AboutEditor() {
-  const { data, isLoading, updateData, updateTimeline } =
-    useAboutData();
+  const { data, isLoading, updateData, updateTimeline } = useAboutData();
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const [aboutImageFile, setAboutImageFile] = useState<File | null>(null);
   const [aboutImagePreview, setAboutImagePreview] = useState<string>("");
@@ -36,11 +35,7 @@ export function AboutEditor() {
   // Add SEO hook
   const seoRefId = data?.id || uuidv4();
   // Get seoConfig from the hook
-  const {
-    seoConfig,
-    updateSEO,
-    isUpdating: isUpdatingSEO,
-  } = useSEO(seoRefId);
+  const { seoConfig, updateSEO, isUpdating: isUpdatingSEO } = useSEO(seoRefId);
 
   const handleUpdateTitle = async (newTitle: string) => {
     await updateData({
@@ -89,9 +84,9 @@ export function AboutEditor() {
       const uploadTasks: Promise<string | boolean>[] = [];
 
       if (currentImageUrl) {
-        const path = getPathFromUrl(currentImageUrl, 'images');
+        const path = getPathFromUrl(currentImageUrl, "images");
         if (path) {
-          uploadTasks.push(deleteFile(path, 'images'));
+          uploadTasks.push(deleteFile(path, "images"));
         }
       }
 
@@ -132,8 +127,8 @@ export function AboutEditor() {
         slug: "about",
       });
     } catch (error) {
-      console.error('Failed to update SEO:', error);
-      toast.error('Failed to update SEO settings');
+      console.error("Failed to update SEO:", error);
+      toast.error("Failed to update SEO settings");
     }
   };
 
@@ -143,9 +138,9 @@ export function AboutEditor() {
       const uploadTasks: Promise<string | boolean>[] = [];
 
       if (currentImageUrl) {
-        const path = getPathFromUrl(currentImageUrl, 'images');
+        const path = getPathFromUrl(currentImageUrl, "images");
         if (path) {
-          uploadTasks.push(deleteFile(path, 'images'));
+          uploadTasks.push(deleteFile(path, "images"));
         }
       }
 
@@ -235,7 +230,7 @@ export function AboutEditor() {
               description: seoConfig?.meta_description || "",
               keywords: seoConfig?.meta_keywords || "",
               og_image: seoConfig?.og_image || "",
-              og_twitter_image: seoConfig?.og_twitter_image || ""
+              og_twitter_image: seoConfig?.og_twitter_image || "",
             }}
             onSubmit={handleSeoSubmit}
             onImageUpload={handleSeoImageUpload}
@@ -395,9 +390,9 @@ export function AboutEditor() {
             <div className="space-y-4">
               {(aboutImagePreview || data?.image_url) && (
                 <div className="relative aspect-[3/4] w-48 overflow-hidden rounded-lg border">
-                  <img 
-                    src={aboutImagePreview || data?.image_url || ""} 
-                    alt="Profile" 
+                  <img
+                    src={aboutImagePreview || data?.image_url || ""}
+                    alt="Profile"
                     className="h-full w-full object-cover"
                   />
                 </div>

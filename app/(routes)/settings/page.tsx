@@ -4,7 +4,7 @@ import { Suspense } from "react";
 
 function SettingsLoading() {
   return (
-    <div className="container h-full py-6">
+    <div className="h-full py-6">
       <Skeleton className="h-8 w-[200px] mb-8" />
       <div className="space-y-6">
         <div className="space-y-2">
@@ -21,7 +21,7 @@ function SettingsLoading() {
 export default function SettingsPage() {
   return (
     <Suspense fallback={<SettingsLoading />}>
-      <div className="container h-full py-6">
+      <div className="h-full p-6">
         <GlobalSettings />
       </div>
     </Suspense>
