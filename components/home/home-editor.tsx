@@ -1,12 +1,12 @@
 "use client";
 
-import { SeoSettingsModal } from "@/components/common/seo-settings-modal";
+import { PostSEOConfigModal, SeoFormValues } from "@/components/posts/seo-config-modal";
 import { Form } from "@/components/ui/form";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useHomeSettings } from "@/hooks/use-home-settings";
 import { useSEO } from "@/hooks/use-seo";
-import { uploadHomeImage } from "@/services/home-service";
+import { deleteFile, getPathFromUrl, uploadImage } from "@/services";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ImageIcon, Layout, Mail, Type } from "lucide-react";
 import { useEffect } from "react";
@@ -18,7 +18,8 @@ import { AboutSection } from "./about-section";
 import { ContactSection } from "./contact-section";
 import { HeroSection } from "./hero-section";
 import { RecipeSection } from "./recipe-section";
-import { formSchema, seoSchema } from "./types";
+import { formSchema } from "./types";
+import { toast } from "sonner";
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -126,32 +127,43 @@ export function HomeEditor() {
     }
   }, [data, form]);
 
-  const handleSeoSubmit = async (values: z.infer<typeof seoSchema>) => {
+  const handleSeoSubmit = async (values: SeoFormValues) => {
     try {
-      const payload: any = {
-        seo_ref_id: seoRefId,
+      await updateSEO({
         meta_title: values.title,
         meta_description: values.description,
         meta_keywords: values.keywords,
-        og_image: values.og_image || null,
+        og_image: values.og_image,
+        og_twitter_image: values.og_twitter_image,
+        seo_ref_id: seoRefId,
         slug: "home",
-      };
-
-      if (seoConfig?.id) {
-        payload.id = seoConfig.id;
-      }
-
-      await updateSEO(payload);
+      });
     } catch (error) {
-      console.error("Error updating SEO settings:", error);
+      console.error('Failed to update SEO:', error);
+      toast.error('Failed to update SEO settings');
     }
   };
 
   const handleSeoImageUpload = async (file: File) => {
-    return await uploadHomeImage({
-      file,
-      path: "home/seo/og-image",
-    });
+    try {
+      const currentImageUrl = seoConfig?.og_image;
+      const uploadTasks: Promise<string | boolean>[] = [];
+
+      if (currentImageUrl) {
+        const path = getPathFromUrl(currentImageUrl, 'images');
+        if (path) {
+          uploadTasks.push(deleteFile(path, 'images'));
+        }
+      }
+
+      uploadTasks.push(uploadImage(file, "home/seo/og-image"));
+      const results = await Promise.all(uploadTasks);
+      return results[results.length - 1] as string;
+    } catch (error) {
+      console.error("Error uploading SEO image:", error);
+      toast.error("Failed to upload SEO image");
+      throw error;
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -230,18 +242,20 @@ export function HomeEditor() {
         <Form {...form}>
           <form onSubmit={handleSubmit} className="space-y-8">
             <div className="flex items-center border-b pb-4">
-              <SeoSettingsModal
-                defaultValues={{
-                  title: seoConfig?.meta_title || "",
-                  description: seoConfig?.meta_description || "",
-                  keywords: seoConfig?.meta_keywords || "",
-                  og_image: seoConfig?.og_image || "",
-                }}
-                onSubmit={handleSeoSubmit}
-                onImageUpload={handleSeoImageUpload}
-                isSaving={isUpdatingSEO}
-                pageName="Home"
-              />
+              <div className="flex items-center justify-end gap-4">
+                <PostSEOConfigModal
+                  defaultValues={{
+                    title: seoConfig?.meta_title || "",
+                    description: seoConfig?.meta_description || "",
+                    keywords: seoConfig?.meta_keywords || "",
+                    og_image: seoConfig?.og_image || "",
+                    og_twitter_image: seoConfig?.og_twitter_image || ""
+                  }}
+                  onSubmit={handleSeoSubmit}
+                  onImageUpload={handleSeoImageUpload}
+                  isSaving={isUpdatingSEO}
+                />
+              </div>
             </div>
 
             <Tabs defaultValue="hero" className="space-y-6">

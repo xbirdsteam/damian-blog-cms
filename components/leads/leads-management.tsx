@@ -25,13 +25,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Search, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, Loader2, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { useState } from "react";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
-import { useLeads, LeadStatus } from "@/hooks/use-leads";
+import { useLeads, LeadStatus, Lead } from "@/hooks/use-leads";
 import { toast } from "sonner";
+import { LeadsTableSkeleton } from "./leads-skeleton";
+import { LeadDataDialog } from "./lead-data-dialog";
 
 // Simplify the statusStyles to just use text colors
 const statusStyles = {
@@ -50,6 +52,8 @@ export function LeadsManagement() {
   const [searchInput, setSearchInput] = useState("");
   const [status, setStatus] = useState<string>("all");
   const perPage = 10;
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [showDataDialog, setShowDataDialog] = useState(false);
 
   const debouncedSearch = useDebounce(searchInput, 500);
 
@@ -76,15 +80,13 @@ export function LeadsManagement() {
     }
   };
 
+  if (isLoading) {
+    return <LeadsTableSkeleton />;
+  }
+
   return (
     <div className="p-6">
       <Card>
-        <CardHeader>
-          <CardTitle>Leads Management</CardTitle>
-          <CardDescription>
-            Manage and track your leads
-          </CardDescription>
-        </CardHeader>
         <CardContent>
           <div className="flex items-center gap-4 mb-6">
             <div className="flex-1">
@@ -121,18 +123,13 @@ export function LeadsManagement() {
                   <TableHead>Email</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading ? (
+                {leads.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center">
-                      <Loader2 className="h-6 w-6 animate-spin mx-auto" />
-                    </TableCell>
-                  </TableRow>
-                ) : leads.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                       No leads found
                     </TableCell>
                   </TableRow>
@@ -182,6 +179,20 @@ export function LeadsManagement() {
                             </SelectItem>
                           </SelectContent>
                         </Select>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedLead(lead);
+                            setShowDataDialog(true);
+                          }}
+                          className="text-blue-600 hover:text-blue-700"
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Data
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))
@@ -236,6 +247,12 @@ export function LeadsManagement() {
           )}
         </CardContent>
       </Card>
+
+      <LeadDataDialog
+        lead={selectedLead}
+        open={showDataDialog}
+        onOpenChange={setShowDataDialog}
+      />
     </div>
   );
 } 

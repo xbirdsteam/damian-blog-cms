@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
@@ -22,7 +23,7 @@ import { Input } from "@/components/ui/input";
 import { LoadingImage } from "@/components/ui/loading-image";
 import { Textarea } from "@/components/ui/textarea";
 import { useHomeSettings } from "@/hooks/use-home-settings";
-import { uploadHomeImage } from "@/services/home-service";
+import { uploadImage } from "@/services";
 import { Loader2, Upload } from "lucide-react";
 import { useState } from "react";
 import { UseFormReturn } from "react-hook-form";
@@ -61,15 +62,12 @@ export function AboutSection({ form }: AboutSectionProps) {
       let imageUrl = form.getValues("about.image_url");
 
       if (aboutImageFile) {
-        imageUrl = await uploadHomeImage({
-          file: aboutImageFile,
-          path: "about",
-        });
+        imageUrl = await uploadImage(aboutImageFile, "home/about");
 
         if (aboutImagePreview) {
           URL.revokeObjectURL(aboutImagePreview);
         }
-        setAboutImagePreview("");
+        setAboutImagePreview(imageUrl);
         setAboutImageFile(null);
       }
 
@@ -127,13 +125,7 @@ export function AboutSection({ form }: AboutSectionProps) {
                 <div className="space-y-4">
                   {(aboutImagePreview || field.value) && (
                     <div className="relative aspect-square w-48 overflow-hidden rounded-lg border">
-                      <LoadingImage
-                        src={aboutImagePreview || field.value}
-                        alt="Profile Preview"
-                        fill
-                        className="object-cover"
-                        unoptimized
-                      />
+                      <img src={aboutImagePreview || field.value} alt="" />
                     </div>
                   )}
                   <div className="flex items-center gap-4">

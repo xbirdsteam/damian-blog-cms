@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
+import { PostSEOConfigModal, SeoFormValues } from "@/components/posts/seo-config-modal";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -12,20 +13,17 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useConsultancyContent } from "@/hooks/use-consultancy";
+import { useSEO } from "@/hooks/use-seo";
+import { deleteFile, getPathFromUrl, uploadImage } from "@/services";
 import {
   ConsultancyContent,
-  WhyWorkWithUsItem,
   ProcessStep,
-  consultancyService,
+  consultancyService
 } from "@/services/consultancy-service";
-import { Loader2, Plus, Save, Trash2, ImageIcon, X } from "lucide-react";
-import { useState, useEffect } from "react";
+import { ImageIcon, Loader2, Plus, Save, Trash2, X } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { SeoSettingsModal } from "@/components/common/seo-settings-modal";
-import { useSEO } from "@/hooks/use-seo";
-import { seoSchema } from "../home/types";
 import { v4 as uuidv4 } from "uuid";
-import * as z from "zod";
 
 export function ConsultancyEditor() {
   const { content, isLoading, isSaving, saveContent } = useConsultancyContent();
@@ -151,44 +149,41 @@ export function ConsultancyEditor() {
     }
   };
 
-  const handleSeoSubmit = async (values: z.infer<typeof seoSchema>) => {
+  const handleSeoSubmit = async (values: SeoFormValues) => {
     try {
-      const payload: any = {
-        seo_ref_id: seoRefId,
+      await updateSEO({
         meta_title: values.title,
         meta_description: values.description,
         meta_keywords: values.keywords,
-        og_image: values.og_image || null,
+        og_image: values.og_image,
+        og_twitter_image: values.og_twitter_image,
+        seo_ref_id: seoRefId,
         slug: "consultancy",
-      };
-
-      if (seoConfig?.id) {
-        payload.id = seoConfig.id;
-      }
-
-      await updateSEO(payload);
+      });
     } catch (error) {
-      console.error("Error updating SEO settings:", error);
+      console.error('Failed to update SEO:', error);
+      toast.error('Failed to update SEO settings');
     }
   };
 
   const handleSeoImageUpload = async (file: File) => {
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("path", "consultancy/seo/og-image");
+      const currentImageUrl = seoConfig?.og_image;
+      const uploadTasks: Promise<string | boolean>[] = [];
 
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
+      if (currentImageUrl) {
+        const path = getPathFromUrl(currentImageUrl, 'images');
+        if (path) {
+          uploadTasks.push(deleteFile(path, 'images'));
+        }
+      }
 
-      if (!response.ok) throw new Error("Failed to upload image");
-
-      const { url } = await response.json();
-      return url;
+      uploadTasks.push(uploadImage(file, "consultancy/seo/og-image"));
+      const results = await Promise.all(uploadTasks);
+      return results[results.length - 1] as string;
     } catch (error) {
       console.error("Error uploading SEO image:", error);
+      toast.error("Failed to upload SEO image");
       throw error;
     }
   };
@@ -204,18 +199,20 @@ export function ConsultancyEditor() {
   return (
     <div className="space-y-6">
       <div className="flex items-center border-b pb-4">
-        <SeoSettingsModal
-          defaultValues={{
-            title: seoConfig?.meta_title || "",
-            description: seoConfig?.meta_description || "",
-            keywords: seoConfig?.meta_keywords || "",
-            og_image: seoConfig?.og_image || "",
-          }}
-          onSubmit={handleSeoSubmit}
-          onImageUpload={handleSeoImageUpload}
-          isSaving={isUpdatingSEO}
-          pageName="Consultancy"
-        />
+        <div className="flex items-center justify-end gap-4">
+          <PostSEOConfigModal
+            defaultValues={{
+              title: seoConfig?.meta_title || "",
+              description: seoConfig?.meta_description || "",
+              keywords: seoConfig?.meta_keywords || "",
+              og_image: seoConfig?.og_image || "",
+              og_twitter_image: seoConfig?.og_twitter_image || ""
+            }}
+            onSubmit={handleSeoSubmit}
+            onImageUpload={handleSeoImageUpload}
+            isSaving={isUpdatingSEO}
+          />
+        </div>
       </div>
 
       {/* Image Upload Card - Moved to top */}

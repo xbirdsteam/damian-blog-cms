@@ -11,6 +11,8 @@ export interface Lead {
   status: LeadStatus;
   form_type: "consultant" | "contact";
   submitted_at: string;
+  form_data: any;
+  content: string;
 }
 
 interface UseLeadsOptions {

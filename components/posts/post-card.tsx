@@ -59,7 +59,7 @@ export function PostCard({ post, href, onClickPost }: PostCardProps) {
   return (
     <>
       <Link 
-        href={href || `/cms/posts/${post.id}`}
+        href={href || `/posts/${post.id}`}
         onClick={handleClick}
       >
         <Card className="h-[400px] flex flex-col">

@@ -5,71 +5,90 @@ import {
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarRail,
+  SidebarRail
 } from "@/components/ui/sidebar";
-import { Briefcase, FileText, Home, Settings, User, MessageSquare, UserPlus } from "lucide-react";
+import { Briefcase, FileText, Home, LogOut, MessageSquare, Settings, User, UserPlus } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import * as React from "react";
+import { createClient } from "@/utils/supabase/client";
+import { toast } from "sonner";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
+  const router = useRouter();
+  
+  const handleLogout = async () => {
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      toast.success("Logged out successfully");
+      router.push("/login");
+    } catch (error) {
+      console.error("Error logging out:", error);
+      toast.error("Failed to log out");
+    }
+  };
 
   const items = [
     {
       title: "Layout Settings",
-      url: "/cms/settings",
+      url: "/settings", 
       icon: Settings,
-      isActive: pathname === "/cms/settings",
+      isActive: pathname === "/settings",
     },
     {
       title: "Home",
-      url: "/cms/home",
+      url: "/home",
       icon: Home,
-      isActive: pathname === "/cms/home",
+      isActive: pathname === "/home",
     },
     {
       title: "About Me",
-      url: "/cms/about",
+      url: "/about",
       icon: User,
-      isActive: pathname === "/cms/about",
+      isActive: pathname === "/about",
     },
     {
       title: "Posts",
-      url: "/cms/posts",
+      url: "/posts",
       icon: FileText,
-      isActive: pathname === "/cms/posts",
+      isActive: pathname === "/posts",
     },
     {
-      title: "Post Comments",
-      url: "/cms/comments",
+      title: "Comments",
+      url: "/comments",
       icon: MessageSquare,
-      isActive: pathname === "/cms/comments",
+      isActive: pathname === "/comments",
     },
     {
       title: "Leads",
-      url: "/cms/leads",
+      url: "/leads",
       icon: UserPlus,
-      isActive: pathname === "/cms/leads",
+      isActive: pathname === "/leads",
     },
     {
       title: "Consultancy",
-      url: "/cms/consultancy",
+      url: "/consultancy",
       icon: Briefcase,
-      isActive: pathname === "/cms/consultancy",
+      isActive: pathname === "/consultancy",
+    },
+    {
+      title: "Users",
+      url: "/users",
+      icon: User,
+      isActive: pathname === "/users",
     },
   ];
 
   return (
     <Sidebar {...props} collapsible="icon">
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent className="pt-10">
+        <SidebarGroup className="h-full">
+          <SidebarGroupContent className="pt-10 flex flex-col h-full">
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
@@ -87,6 +106,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+            </SidebarMenu>
+
+            <SidebarMenu className="mt-auto pb-6">
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={handleLogout}
+                  className="cursor-pointer text-destructive hover:text-destructive hover:bg-destructive/10"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Logout</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

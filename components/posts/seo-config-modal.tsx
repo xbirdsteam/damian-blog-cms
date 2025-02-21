@@ -66,13 +66,7 @@ export function PostSEOConfigModal({
   const [open, setOpen] = useState(false);
   const form = useForm<SeoFormValues>({
     resolver: zodResolver(seoSchema),
-    defaultValues: {
-      title: "",
-      description: "",
-      keywords: "",
-      og_image: "",
-      og_twitter_image: "",
-    },
+    defaultValues,
   });
 
   // Reset form with default values when modal opens
@@ -88,41 +82,53 @@ export function PostSEOConfigModal({
     }
   }, [open, defaultValues, form]);
 
-  const [imageFile, setImageFile] = useState<{
-    default?: File;
-    twitter?: File;
-  }>({});
-  const [imagePreview, setImagePreview] = useState<{
-    default?: string;
-    twitter?: string;
-  }>({});
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
+  const [twitterImageFile, setTwitterImageFile] = useState<File | null>(null);
+  const [twitterImagePreview, setTwitterImagePreview] = useState<string>("");
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
 
-  const handleImageSelect = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-    type: "default" | "twitter"
-  ) => {
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (imagePreview[type]) {
-      URL.revokeObjectURL(imagePreview[type]!);
+    if (imagePreview) {
+      URL.revokeObjectURL(imagePreview);
     }
 
     const previewUrl = URL.createObjectURL(file);
-    setImagePreview((prev) => ({ ...prev, [type]: previewUrl }));
-    setImageFile((prev) => ({ ...prev, [type]: file }));
+    setImagePreview(previewUrl);
+    setImageFile(file);
+    // Mark the form as dirty when image is selected
+    form.setValue("og_image", previewUrl, { shouldDirty: true });
+  };
+
+  const handleTwitterImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (twitterImagePreview) {
+      URL.revokeObjectURL(twitterImagePreview);
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    setTwitterImagePreview(previewUrl);
+    setTwitterImageFile(file);
+    // Mark the form as dirty when twitter image is selected
+    form.setValue("og_twitter_image", previewUrl, { shouldDirty: true });
   };
 
   const handleSubmit = async (values: SeoFormValues) => {
     try {
+      setIsUploadingImages(true); // Start loading when uploading images
       let ogImage = values.og_image;
       let ogTwitterImage = values.og_twitter_image;
 
-      if (imageFile.default) {
-        ogImage = await onImageUpload(imageFile.default, "default");
+      if (imageFile) {
+        ogImage = await onImageUpload(imageFile, "default");
       }
-      if (imageFile.twitter) {
-        ogTwitterImage = await onImageUpload(imageFile.twitter, "twitter");
+      if (twitterImageFile) {
+        ogTwitterImage = await onImageUpload(twitterImageFile, "twitter");
       }
 
       await onSubmit({
@@ -132,13 +138,16 @@ export function PostSEOConfigModal({
       });
 
       // Cleanup previews
-      Object.values(imagePreview).forEach((url) => {
-        if (url) URL.revokeObjectURL(url);
-      });
-      setImagePreview({});
-      setImageFile({});
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+      if (twitterImagePreview) URL.revokeObjectURL(twitterImagePreview);
+      setImagePreview("");
+      setImageFile(null);
+      setTwitterImagePreview("");
+      setTwitterImageFile(null);
     } catch (error) {
       console.error("Error in SEO submit:", error);
+    } finally {
+      setIsUploadingImages(false); // End loading after upload completes or fails
     }
   };
 
@@ -231,10 +240,10 @@ export function PostSEOConfigModal({
                   <FormLabel>OG Image</FormLabel>
                   <FormControl>
                     <div className="space-y-4">
-                      {(imagePreview.default || field.value) && (
+                      {(imagePreview || field.value) && (
                         <div className="relative aspect-[1200/630] w-full overflow-hidden rounded-lg border">
                           <img
-                            src={imagePreview.default || field.value}
+                            src={imagePreview || field.value}
                             alt="OG Preview"
                             className="h-full w-full object-cover"
                           />
@@ -244,7 +253,7 @@ export function PostSEOConfigModal({
                         <Input
                           type="file"
                           accept="image/*"
-                          onChange={(e) => handleImageSelect(e, "default")}
+                          onChange={handleImageSelect}
                           className="hidden"
                           id="og-image-upload"
                         />
@@ -279,10 +288,10 @@ export function PostSEOConfigModal({
                   <FormLabel>Twitter Card Image</FormLabel>
                   <FormControl>
                     <div className="space-y-4">
-                      {(imagePreview.twitter || field.value) && (
+                      {(twitterImagePreview || field.value) && (
                         <div className="relative aspect-[1200/630] w-full overflow-hidden rounded-lg border">
                           <img
-                            src={imagePreview.twitter || field.value}
+                            src={twitterImagePreview || field.value}
                             alt="Twitter Card Preview"
                             className="h-full w-full object-cover"
                           />
@@ -292,7 +301,7 @@ export function PostSEOConfigModal({
                         <Input
                           type="file"
                           accept="image/*"
-                          onChange={(e) => handleImageSelect(e, "twitter")}
+                          onChange={handleTwitterImageSelect}
                           className="hidden"
                           id="og-twitter-image-upload"
                         />
@@ -319,11 +328,14 @@ export function PostSEOConfigModal({
             />
 
             <div className="flex justify-end pt-4">
-              <Button type="submit" disabled={!form.formState.isDirty || isSaving}>
-                {isSaving ? (
+              <Button 
+                type="submit" 
+                disabled={isSaving || isUploadingImages}
+              >
+                {(isSaving || isUploadingImages) ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving Changes...
+                    {isUploadingImages ? "Uploading Images..." : "Saving Changes..."}
                   </>
                 ) : (
                   "Save SEO Settings"

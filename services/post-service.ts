@@ -1,8 +1,5 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-import { createClient } from "@/utils/supabase/client";
 import { Section } from "@/types/editor";
-import { SEOConfig } from "@/services/seo-service";
+import { createClient } from "@/utils/supabase/client";
 
 export interface Post {
     id?: string;
@@ -23,6 +20,7 @@ export interface Post {
     updated_at: string;
     categoryIds: string[];
     tags: string[];
+    author_id: string;
 }
 
 export interface CreatePostOptions {
@@ -35,6 +33,7 @@ export interface CreatePostOptions {
     content: Section[]; // This will store all sections
     publish_date: Date | null;
     tags: string[];
+    author_id: string;
 }
 
 export interface PostStats {
@@ -56,6 +55,49 @@ export interface PaginatedPosts {
     page: number;
     perPage: number;
     totalPages: number;
+}
+
+export enum PostStatus {
+    DRAFT = "draft",
+    PUBLISHED = "published",
+}
+
+export interface PostDetail {
+    id: string;
+    title: string;
+    slug: string;
+    short_description: string;
+    content: string;
+    status: PostStatus;
+    publish_date: string;
+    post_img: string;
+    created_at: string;
+    updated_at: string;
+    posts_categories?: PostsCategories[];
+    next_post?: {
+        title: string;
+        slug: string;
+    } | null;
+    prev_post?: {
+        title: string;
+        slug: string;
+    } | null;
+    tags?: string[];
+}
+
+export interface PostsCategories {
+    categories: {
+        id: number;
+        name: string;
+    }
+}
+
+interface GetPostsOptions {
+    page?: number;
+    perPage?: number;
+    categories?: string[];
+    search?: string;
+    status?: string;
 }
 
 export const postService = {
@@ -109,6 +151,7 @@ export const postService = {
         if (options.content) updates.content = JSON.stringify(options.content);
         if (options.publish_date) updates.publish_date = options.publish_date;
         if (options.tags) updates.tags = options.tags;
+        if (options.author_id) updates.author_id = options.author_id;
         // Get the post's created_at timestamp
         const { data: currentPost } = await supabase
             .from("posts")
@@ -165,6 +208,7 @@ export const postService = {
             updated_at: now,
             publish_date: options.publish_date,
             tags: options.tags,
+            author_id: options.author_id,
         }).select().single();
 
         if (error) throw error;
@@ -186,29 +230,29 @@ export const postService = {
         return data;
     },
 
-    async getPosts(options?: {
-        categories?: string[];
-        page?: number;
-        perPage?: number;
-        search?: string;
-    }) {
+    async getPosts({ page = 1, perPage = 10, categories, search, status }: GetPostsOptions = {}) {
         const supabase = createClient();
-        const page = options?.page || 1;
-        const perPage = options?.perPage || 10;
-        const start = (page - 1) * perPage;
-        const end = start + perPage - 1;
-
-        // First, get post IDs that match the category filter
+        
+        // First, get post IDs that match the category filter if categories are selected
         let postIds: string[] = [];
-        if (options?.categories && options.categories.length > 0) {
+        if (categories?.length) {
             const { data: filteredPosts } = await supabase
                 .from('posts_categories')
-                .select(`
-                    post_id
-                `)
-                .in('category_id', options.categories);
+                .select('post_id')
+                .in('category_id', categories);
 
             postIds = Array.from(new Set(filteredPosts?.map(p => p.post_id) || []));
+            
+            // If no posts found for selected categories, return empty result
+            if (postIds.length === 0) {
+                return {
+                    posts: [],
+                    pagination: {
+                        currentPage: page,
+                        totalPages: 0,
+                    }
+                };
+            }
         }
 
         // Now get the full post data
@@ -217,7 +261,6 @@ export const postService = {
             .select(`
                 *,
                 posts_categories (
-                    category_id,
                     categories (
                         id,
                         name
@@ -225,38 +268,35 @@ export const postService = {
                 )
             `, { count: 'exact' });
 
-        // Add search filter if provided
-        if (options?.search) {
-            query = query.or(`title.ilike.%${options.search}%,short_description.ilike.%${options.search}%`);
-        }
-
-        // Add category filter using post IDs if categories were selected
-        if (options?.categories && options.categories.length > 0) {
-            if (postIds.length === 0) {
-                return {
-                    posts: [],
-                    currentPage: page,
-                    perPage,
-                    total: 0,
-                    totalPages: 0,
-                };
-            }
+        // Apply filters
+        if (categories?.length) {
             query = query.in('id', postIds);
         }
 
-        // Add pagination and ordering
-        const { data: posts, error, count } = await query
+        if (search) {
+            query = query.ilike('title', `%${search}%`);
+        }
+
+        if (status) {
+            query = query.eq('status', status);
+        }
+
+        // Add pagination
+        const from = (page - 1) * perPage;
+        const to = from + perPage - 1;
+
+        const { data, count, error } = await query
             .order('created_at', { ascending: false })
-            .range(start, end);
+            .range(from, to);
 
         if (error) throw error;
 
         return {
-            posts: (posts || []) as Post[],
-            currentPage: page,
-            perPage,
-            total: count || 0,
-            totalPages: count ? Math.ceil(count / perPage) : 0,
+            posts: data || [],
+            pagination: {
+                currentPage: page,
+                totalPages: Math.ceil((count || 0) / perPage),
+            },
         };
     },
 
@@ -379,4 +419,96 @@ export const postService = {
 
         return stats;
     },
+
+    async generateUniqueSlug(title: string, currentPostId?: string | null) {
+        const supabase = createClient();
+        
+        // Generate base slug from title
+        let slug = title
+            .toLowerCase()
+            .trim()
+            .replace(/[^a-z0-9]+/g, '-')    // Replace non-alphanumeric with hyphens
+            .replace(/^-+|-+$/g, '')        // Remove leading/trailing hyphens
+            .substring(0, 60);              // Limit length
+        
+        // Check if slug exists
+        const { data: existingPost } = await supabase
+            .from('posts')
+            .select('id, slug')
+            .eq('slug', slug)
+            .neq('id', currentPostId || '')  // Exclude current post if updating
+            .single();
+
+        if (existingPost) {
+            // If slug exists, add incremental number
+            let counter = 1;
+            let newSlug = slug;
+            
+            while (true) {
+                newSlug = `${slug}-${counter}`;
+                
+                const { data: checkPost } = await supabase
+                    .from('posts')
+                    .select('id')
+                    .eq('slug', newSlug)
+                    .neq('id', currentPostId || '')
+                    .single();
+                
+                if (!checkPost) break;
+                counter++;
+            }
+            
+            slug = newSlug;
+        }
+
+        return slug;
+    },
+    getPostBySlug :async (slug: string): Promise<PostDetail | null> => {
+        const supabase = createClient()
+    
+        // Get the main post with categories
+        const { data: post, error } = await supabase
+            .from('posts')
+            .select(`
+                *,
+                posts_categories (
+                    categories (
+                        id,
+                        name
+                    )
+                )
+            `)
+            .eq('slug', slug)
+            .single()
+    
+        if (error || !post) {
+            return null
+        }
+    
+        // Get next and previous posts based on created_at
+        const [prevPostResult, nextPostResult] = await Promise.all([
+            supabase
+                .from('posts')
+                .select('title, slug')
+                .eq('status', 'published')
+                .lt('created_at', post.created_at)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single(),
+            supabase
+                .from('posts')
+                .select('title, slug')
+                .eq('status', 'published')
+                .gt('created_at', post.created_at)
+                .order('created_at', { ascending: true })
+                .limit(1)
+                .single()
+        ])
+    
+        return {
+            ...post,
+            prev_post: prevPostResult.data,
+            next_post: nextPostResult.data
+        }
+    }
 };

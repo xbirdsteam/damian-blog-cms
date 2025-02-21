@@ -21,7 +21,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useHomeSettings } from "@/hooks/use-home-settings";
-import { uploadHomeImage } from "@/services/home-service";
+import { deleteFile, getPathFromUrl, uploadVideo } from "@/services";
 import { Loader2, Upload } from "lucide-react";
 import { useState } from "react";
 import { UseFormReturn } from "react-hook-form";
@@ -70,17 +70,25 @@ export function RecipeSection({ form }: RecipeSectionProps) {
       setUpdatingSection(true);
 
       let videoUrl = form.getValues("recipes.video_url");
-
       if (recipeVideoFile) {
-        videoUrl = await uploadHomeImage({
-          file: recipeVideoFile,
-          path: "recipes",
-        });
+        const uploadTasks: Promise<string | boolean>[] = [];
+        if (videoUrl) {
+          const path = getPathFromUrl(videoUrl, 'videos');
+          if (path) {
+            uploadTasks.push(deleteFile(path, 'videos'));
+          }
+        }
+
+        uploadTasks.push(uploadVideo(recipeVideoFile, "home/recipes"));
+
+        const results = await Promise.all(uploadTasks);
+        
+        videoUrl = results[results.length - 1] as string;
 
         if (recipeVideoPreview) {
           URL.revokeObjectURL(recipeVideoPreview);
         }
-        setRecipeVideoPreview("");
+        setRecipeVideoPreview(videoUrl);
         setRecipeVideoFile(null);
       }
 

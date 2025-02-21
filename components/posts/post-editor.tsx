@@ -35,8 +35,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCategories } from "@/hooks/use-categories";
 import { usePosts } from "@/hooks/use-posts";
 import { useSEO } from "@/hooks/use-seo";
-import { slugify } from "@/lib/utils";
-import { Post } from "@/services/post-service";
+import { Post, postService } from "@/services/post-service";
 import { uploadService } from "@/services/upload-service";
 import { Section, SectionType } from "@/types/editor";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -63,9 +62,9 @@ import {
   TextSection,
 } from "./sections";
 import { ListSection } from "./sections/list-section";
-import { PostAuthorSection } from "./sections/post-author-section";
 import { SortableSections } from "./sections/sortable-sections";
 import { PostSEOConfigModal, SeoFormValues } from "./seo-config-modal";
+import { createClient } from "@/utils/supabase/client";
 
 // Update form schema to match the actual post structure
 const formSchema = z.object({
@@ -179,25 +178,29 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
 
   const isSaving = isCreating || isUpdating;
 
-  // Watch title changes and update slug
+  // Auto-generate slug when title changes
   useEffect(() => {
-    const subscription = form.watch((value, { name }) => {
-      // Update slug when title changes
+    const subscription = form.watch(async (value, { name }) => {
       if (name === "title") {
-        const newSlug = slugify(value.title || "");
-        form.setValue("slug", newSlug, { shouldDirty: true });
+        const title = value.title;
+        if (title) {
+          const currentId = initialData?.id || null;
+          const slug = await postService.generateUniqueSlug(title, currentId);
+          form.setValue("slug", slug, { shouldDirty: true });
+        }
       }
     });
-
+    
     return () => subscription.unsubscribe();
-  }, [form]);
+  }, [form, initialData?.id]);
 
-  const onSubmit = async (values: FormValues, isDraft: boolean = true) => {
+  const onSubmit = async (values: FormValues, isDraft: boolean = false) => {
     try {
       setIsPublishing(!isDraft);
       const status: PostStatus = isDraft ? "draft" : "published";
 
       if (mode === "edit" && initialData?.id) {
+        // Update post - no need to get user
         await updatePost({
           id: initialData.id,
           title: values.title,
@@ -210,9 +213,17 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
           publish_date: isDraft ? null : new Date(),
           tags: tags,
         });
-        toast.success(isDraft ? "Post updated successfully" : "Post published successfully");
+        toast.success(isDraft ? "Post updated successfully (Draft)" : "Post published successfully");
       } else {
-        // Create post
+        // Only get user for new post creation
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (!user) {
+          throw new Error("Not authenticated");
+        }
+
+        // Create new post with author_id
         const newPost = await createPost({
           title: values.title,
           slug: values.slug,
@@ -223,9 +234,10 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
           categoryIds: values.categoryIds,
           publish_date: isDraft ? null : new Date(),
           tags: tags,
+          author_id: user.id,
         });
 
-        // If SEO data was configured, create SEO config for the new post
+        // SEO config handling remains same
         if (values.seo_config) {
           await updateSEO({
             seo_ref_id: newPost.id,
@@ -234,11 +246,11 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
             meta_keywords: values.seo_config.meta_keywords,
             og_image: values.seo_config.og_image,
             og_twitter_image: values.seo_config.og_twitter_image,
-            slug: `gastronomy/${values.slug}`,
+            slug: `${values.slug}`,
           });
         }
 
-        toast.success(isDraft ? "Post created successfully" : "Post published successfully");
+        toast.success(isDraft ? "Post created successfully (Draft)" : "Post published successfully");
       }
     } catch (error) {
       console.error(error);
@@ -453,7 +465,6 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
     { type: "testimonial", label: "Testimonial" },
     { type: "image", label: "Image" },
     { type: "list", label: "List" },
-    { type: "post-author", label: "Post Author" },
   ] as const;
 
   // Add category handler
@@ -519,7 +530,7 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
         meta_keywords: seoValues.keywords,
         og_image: seoValues.og_image,
         og_twitter_image: seoValues.og_twitter_image,
-        slug: `gastronomy/${postSlug}`,
+        slug: `${postSlug}`,
       });
     } catch (error) {
       console.error(error);
@@ -542,7 +553,7 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
       <div className="mx-auto p-6">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
-            <Link href="/cms/posts">
+            <Link href="/posts">
               <Button variant="outline" size="sm" className="cursor-pointer">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Posts
@@ -570,16 +581,17 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
         </h1>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit((data) => onSubmit(data, true))}>
+          <form>
             <div className="space-y-6">
               <Card>
                 <CardContent className="p-6">
                   <div className="flex justify-end mb-4">
                     <div className="flex items-center gap-2">
                       <Button
-                        type="submit"
+                        type="button"
                         variant="outline"
                         disabled={isSaving}
+                        onClick={() => form.handleSubmit((data) => onSubmit(data, true))()}
                         className="cursor-pointer"
                       >
                         {isSaving && !isPublishing ? (
@@ -597,7 +609,7 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
                       <Button
                         type="button"
                         disabled={isSaving}
-                        onClick={() => onSubmit(form.getValues(), false)}
+                        onClick={() => form.handleSubmit((data) => onSubmit(data, false))()}
                         className="cursor-pointer"
                       >
                         {isPublishing ? (
@@ -629,28 +641,6 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
                               className="text-lg"
                             />
                           </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="slug"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Slug</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="post-url-slug"
-                              {...field}
-                              readOnly
-                              className="bg-muted cursor-not-allowed"
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            Auto-generated from title
-                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -870,15 +860,6 @@ export function PostEditor({ initialData, mode }: PostEditorProps) {
                           case "list":
                             return (
                               <ListSection
-                                section={section}
-                                onUpdate={handleUpdateSection}
-                                onDelete={handleDeleteSection}
-                              />
-                            );
-                          case "post-author":
-                            return (
-                              <PostAuthorSection
-                                key={section.id}
                                 section={section}
                                 onUpdate={handleUpdateSection}
                                 onDelete={handleDeleteSection}

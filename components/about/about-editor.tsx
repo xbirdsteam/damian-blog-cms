@@ -3,17 +3,6 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { useAboutData } from "@/hooks/use-about-data";
-import { TimelineItem, LinkItem } from "@/types/about";
-import { Pencil, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
-import { EditDialog } from "./edit-dialog";
-import { TimelineDialog } from "./timeline-dialog";
-import { ImageDialog } from "./image-dialog";
-import { SeoSettingsModal } from "@/components/common/seo-settings-modal";
-import * as z from "zod";
-import { v4 as uuidv4 } from "uuid";
-import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -22,15 +11,27 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
+import { useAboutData } from "@/hooks/use-about-data";
 import { useSEO } from "@/hooks/use-seo";
-import { seoSchema } from "../home/types"; // Reuse the schema from home
+import { deleteFile, getPathFromUrl, uploadImage } from "@/services";
+import { LinkItem, TimelineItem } from "@/types/about";
+import { Loader2, Pencil, Plus, Trash2, Upload } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+import { v4 as uuidv4 } from "uuid";
+import { PostSEOConfigModal, SeoFormValues } from "../posts/seo-config-modal";
+import { AboutEditorSkeleton } from "./about-editor-skeleton";
+import { EditDialog } from "./edit-dialog";
+import { TimelineDialog } from "./timeline-dialog";
 
 export function AboutEditor() {
-  const { data, isLoading, updateData, updateTimeline, uploadImage } =
+  const { data, isLoading, updateData, updateTimeline } =
     useAboutData();
   const [editingSection, setEditingSection] = useState<string | null>(null);
+  const [aboutImageFile, setAboutImageFile] = useState<File | null>(null);
+  const [aboutImagePreview, setAboutImagePreview] = useState<string>("");
+  const [updatingImage, setUpdatingImage] = useState<boolean>(false);
 
   // Add SEO hook
   const seoRefId = data?.id || uuidv4();
@@ -66,28 +67,96 @@ export function AboutEditor() {
     await updateTimeline({ id: data?.id || uuidv4(), timelines: newTimeline });
   };
 
-  const handleUploadImage = async (file: File) => {
-    await uploadImage(data?.id || uuidv4(), file, "about/profile");
+  const handleAboutImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (aboutImagePreview) {
+      URL.revokeObjectURL(aboutImagePreview);
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    setAboutImagePreview(previewUrl);
+    setAboutImageFile(file);
+  };
+
+  const handleImageUpdate = async () => {
+    if (!aboutImageFile) return;
+
+    try {
+      setUpdatingImage(true);
+      const currentImageUrl = data?.image_url;
+      const uploadTasks: Promise<string | boolean>[] = [];
+
+      if (currentImageUrl) {
+        const path = getPathFromUrl(currentImageUrl, 'images');
+        if (path) {
+          uploadTasks.push(deleteFile(path, 'images'));
+        }
+      }
+
+      uploadTasks.push(uploadImage(aboutImageFile, "about/profile"));
+
+      const results = await Promise.all(uploadTasks);
+      const imageUrl = results[results.length - 1] as string;
+
+      await updateData({
+        id: data?.id || uuidv4(),
+        updates: { image_url: imageUrl },
+      });
+
+      if (aboutImagePreview) {
+        URL.revokeObjectURL(aboutImagePreview);
+      }
+      setAboutImagePreview(imageUrl);
+      setAboutImageFile(null);
+      toast.success("Profile image updated successfully");
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      toast.error("Failed to update profile image");
+    } finally {
+      setUpdatingImage(false);
+    }
   };
 
   // Add SEO handlers
-  const handleSeoSubmit = async (values: z.infer<typeof seoSchema>) => {
+  const handleSeoSubmit = async (values: SeoFormValues) => {
     try {
       await updateSEO({
-        seo_ref_id: seoRefId,
         meta_title: values.title,
         meta_description: values.description,
         meta_keywords: values.keywords,
-        og_image: values.og_image || null,
+        og_image: values.og_image,
+        og_twitter_image: values.og_twitter_image,
+        seo_ref_id: seoRefId,
         slug: "about",
       });
     } catch (error) {
-      console.error("Error updating SEO settings:", error);
+      console.error('Failed to update SEO:', error);
+      toast.error('Failed to update SEO settings');
     }
   };
 
   const handleSeoImageUpload = async (file: File) => {
-    return await uploadImage(data?.id || uuidv4(), file, "about/seo/og-image");
+    try {
+      const currentImageUrl = seoConfig?.og_image;
+      const uploadTasks: Promise<string | boolean>[] = [];
+
+      if (currentImageUrl) {
+        const path = getPathFromUrl(currentImageUrl, 'images');
+        if (path) {
+          uploadTasks.push(deleteFile(path, 'images'));
+        }
+      }
+
+      uploadTasks.push(uploadImage(file, "about/seo/og-image"));
+      const results = await Promise.all(uploadTasks);
+      return results[results.length - 1] as string;
+    } catch (error) {
+      console.error("Error uploading SEO image:", error);
+      toast.error("Failed to upload SEO image");
+      throw error;
+    }
   };
 
   const handleUpdateWhereIAm = async (newContent: string) => {
@@ -105,11 +174,7 @@ export function AboutEditor() {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <div className="text-muted-foreground">Loading...</div>
-      </div>
-    );
+    return <AboutEditorSkeleton />;
   }
 
   // Render mission content with proper fallback
@@ -163,19 +228,20 @@ export function AboutEditor() {
   return (
     <div className="relative mx-auto space-y-12 px-2 sm:px-4 pb-12 md:space-y-24 md:pb-24">
       <div className="flex items-center border-b pb-4">
-        <SeoSettingsModal
-          defaultValues={{
-            // Use seoConfig data if available, fallback to empty strings
-            title: seoConfig?.meta_title || "",
-            description: seoConfig?.meta_description || "",
-            keywords: seoConfig?.meta_keywords || "",
-            og_image: seoConfig?.og_image || "",
-          }}
-          onSubmit={handleSeoSubmit}
-          onImageUpload={handleSeoImageUpload}
-          isSaving={isUpdatingSEO}
-          pageName="About"
-        />
+        <div className="flex items-center justify-end gap-4">
+          <PostSEOConfigModal
+            defaultValues={{
+              title: seoConfig?.meta_title || "",
+              description: seoConfig?.meta_description || "",
+              keywords: seoConfig?.meta_keywords || "",
+              og_image: seoConfig?.og_image || "",
+              og_twitter_image: seoConfig?.og_twitter_image || ""
+            }}
+            onSubmit={handleSeoSubmit}
+            onImageUpload={handleSeoImageUpload}
+            isSaving={isUpdatingSEO}
+          />
+        </div>
       </div>
 
       {/* Title Section */}
@@ -300,51 +366,90 @@ export function AboutEditor() {
         </div>
       </section>
 
-      {/* Image and Timeline Section */}
-      <div className="grid gap-8 xl:grid-cols-2 xl:gap-12">
-        {/* Profile Image */}
-        <section className="group relative flex flex-col gap-2 md:flex-row md:gap-4">
-          <div className="w-auto md:w-16 md:text-center">
-            <span className="text-sm font-medium text-muted-foreground">
-              06
-            </span>
-          </div>
-          <div className="flex-1 space-y-4 border-l-2 border-primary pl-3 sm:pl-4 md:pl-8">
+      {/* Profile Image - Now full width */}
+      <section className="group relative">
+        <div className="flex items-center gap-4">
+          <span className="text-sm font-medium text-muted-foreground w-16 text-center">
+            06
+          </span>
+          <div className="flex-1 space-y-4 border-l-2 border-primary pl-8">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
                 Profile Image
               </span>
               <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setEditingSection("image")}
-                className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                type="button"
+                onClick={handleImageUpdate}
+                disabled={!aboutImageFile || updatingImage}
               >
-                <Pencil className="h-4 w-4" />
+                {updatingImage ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  "Update Image"
+                )}
               </Button>
             </div>
-            <div className="relative mx-auto max-w-sm overflow-hidden rounded-xl border bg-muted group/image">
-              <div className="absolute inset-0 -translate-x-full group-hover/image:animate-sweep bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-              <img
-                src={
-                  data?.image_url ||
-                  "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=800&h=1067&fit=crop"
-                }
-                alt="Profile"
-                className="aspect-[3/4] h-full w-full object-cover"
-              />
+            <div className="space-y-4">
+              {(aboutImagePreview || data?.image_url) && (
+                <div className="relative aspect-[3/4] w-48 overflow-hidden rounded-lg border">
+                  <img 
+                    src={aboutImagePreview || data?.image_url || ""} 
+                    alt="Profile" 
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              )}
+              <div className="flex items-center gap-4">
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAboutImageSelect}
+                  className="hidden"
+                  id="about-image-upload"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() =>
+                    document.getElementById("about-image-upload")?.click()
+                  }
+                  disabled={updatingImage}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  {data?.image_url ? "Change Image" : "Choose Image"}
+                </Button>
+                {aboutImageFile && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setAboutImageFile(null);
+                      if (aboutImagePreview) {
+                        URL.revokeObjectURL(aboutImagePreview);
+                      }
+                      setAboutImagePreview("");
+                    }}
+                    disabled={updatingImage}
+                  >
+                    Cancel
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* Timeline History */}
-        <section className="group relative flex flex-col gap-2 md:flex-row md:gap-4">
-          <div className="w-auto md:w-16 md:text-center">
-            <span className="text-sm font-medium text-muted-foreground">
-              07
-            </span>
-          </div>
-          <div className="flex-1 space-y-4 border-l-2 border-primary pl-3 sm:pl-4 md:pl-8">
+      {/* Timeline History - Now full width */}
+      <section className="group relative">
+        <div className="flex items-center gap-4">
+          <span className="text-sm font-medium text-muted-foreground w-16 text-center">
+            07
+          </span>
+          <div className="flex-1 space-y-4 border-l-2 border-primary pl-8">
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
                 Timeline
@@ -373,8 +478,8 @@ export function AboutEditor() {
               ))}
             </div>
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
 
       {/* Edit Dialogs */}
       <EditDialog
@@ -404,15 +509,6 @@ export function AboutEditor() {
         onOpenChange={(open) => !open && setEditingSection(null)}
         items={data?.timelines ?? []}
         onSave={handleUpdateTimeline}
-      />
-      <ImageDialog
-        open={editingSection === "image"}
-        onOpenChange={(open) => !open && setEditingSection(null)}
-        currentImage={
-          data?.image_url ||
-          "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=800&h=1067&fit=crop"
-        }
-        onSave={handleUploadImage}
       />
       <EditDialog
         open={editingSection === "where_i_am"}

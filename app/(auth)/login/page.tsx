@@ -60,7 +60,7 @@ export default function LoginPage() {
       } else {
         await authService.signIn(data.email, data.password);
         toast.success("Logged in successfully");
-        router.push("/cms/settings");
+        router.push("/settings");
         router.refresh();
       }
     } catch (error: any) {

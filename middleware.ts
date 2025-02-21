@@ -18,7 +18,7 @@ export async function middleware(request: NextRequest) {
 
     // If there's a session and the user is on the login page
     if (session && request.nextUrl.pathname === "/login") {
-        const redirectUrl = new URL("/cms/settings", request.url);
+        const redirectUrl = new URL("/settings", request.url);
         return NextResponse.redirect(redirectUrl);
     }
 
@@ -26,5 +26,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-    matcher: ["/cms/:path*", "/login"],
+    matcher: ["/:path*", "/login"],
 }; 

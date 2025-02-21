@@ -1,6 +1,6 @@
 'use client'
 import { CreatePostOptions, PaginatedPosts, Post, postService, PostStats } from "@/services/post-service";
-import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation, keepPreviousData } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 // Separate hook for stats to avoid duplicate queries
@@ -14,44 +14,29 @@ export function usePostStats() {
 }
 
 interface UsePostsOptions {
-    categories?: string[];
-    enabled?: boolean;
     page?: number;
     perPage?: number;
+    categories?: string[];
     search?: string;
+    status?: string;
 }
 
-export function usePosts(options: UsePostsOptions = {}) {
+export function usePosts({
+    page = 1,
+    perPage = 10,
+    categories,
+    search,
+    status,
+}: UsePostsOptions = {}) {
+    const queryKey = ['posts', page, perPage, categories, search, status];
     const queryClient = useQueryClient();
-    const queryKey = ["posts", {
-        categories: options.categories,
-        page: options.page || 1,
-        search: options.search
-    }];
-
-    const {
-        data: paginatedPosts,
-        isLoading,
-        refetch,
-    } = useQuery<PaginatedPosts>({
+    
+    const { data, isLoading } = useQuery({
         queryKey,
-        queryFn: async () => {
-            const result = await postService.getPosts(options);
-            // Transform the result to match PaginatedPosts interface
-            return {
-                posts: result.posts,
-                page: result.currentPage,
-                perPage: result.perPage,
-                total: result.total,
-                totalPages: result.totalPages,
-            };
-        },
-        enabled: options.enabled !== false,
-        staleTime: 1000 * 60 * 5,
-        gcTime: 1000 * 60 * 15,
+        queryFn: () => postService.getPosts({ page, perPage, categories, search, status }),
+        placeholderData: keepPreviousData,
     });
 
-    // Mutations
     const { mutateAsync: createPost, isPending: isCreating } = useMutation({
         mutationFn: (newPost: CreatePostOptions) => postService.createPost(newPost),
         onSuccess: () => {
@@ -98,21 +83,15 @@ export function usePosts(options: UsePostsOptions = {}) {
     });
 
     return {
-        posts: paginatedPosts?.posts || [],
-        pagination: {
-            currentPage: paginatedPosts?.page || 1,
-            totalPages: paginatedPosts?.totalPages || 0,
-            total: paginatedPosts?.total || 0,
-            perPage: paginatedPosts?.perPage || 12,
-        },
+        posts: data?.posts ?? [],
+        pagination: data?.pagination ?? { currentPage: 1, totalPages: 1 },
         isLoading,
-        isCreating,
-        isUpdating,
-        isDeleting,
-        refetch,
         createPost,
         updatePost,
         deletePost,
+        isCreating,
+        isUpdating,
+        isDeleting
     };
 }
 
@@ -123,7 +102,6 @@ export function usePost(postId: string) {
     return useQuery<Post>({
         queryKey: ["post", postId],
         queryFn: () => postService.getPost(postId),
-        staleTime: 1000 * 60 * 5,
         initialData: () => {
             // Use posts list as initial data source if available
             const posts = queryClient.getQueryData<PaginatedPosts>(["posts"])?.posts;

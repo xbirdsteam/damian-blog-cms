@@ -10,13 +10,13 @@ export default function AppSidebarInset() {
 
   const getPageTitle = () => {
     switch (pathname) {
-      case "/cms/settings":
+      case "/settings":
         return "Layout Settings";
-      case "/cms/home":
+      case "/home":
         return "Home Page";
-      case "/cms/about":
+      case "/about":
         return "About Me";
-      case "/cms/posts":
+      case "/posts":
         return "Posts";
       default:
         return "Dashboard";
